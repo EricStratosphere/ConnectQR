@@ -1,56 +1,178 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { signOut } from '../lib/supabase';
 
 export default function StudentDashboard({ navigation, profile }) {
+  // Hardcoded class data to match the design (replace with your dynamic state later)
+  const activeClass = {
+    code: 'CSci 145',
+    name: 'Platform Based Development',
+    closingTime: '10:15 AM',
+  };
+
+  const upcomingClass = {
+    code: 'CSci 121',
+    name: 'Computer Organization',
+  };
+
+  // Determine the display name (defaults to 'student' if no profile name exists)
+  const displayName = profile?.full_name ? profile.full_name.toLowerCase() : 'student';
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {profile?.full_name ?? 'Student'} 👋</Text>
-        <Text style={styles.role}>Student</Text>
+        <Text style={styles.greetingText}>
+          Hello, <Text style={styles.greetingName}>{displayName}</Text>
+        </Text>
       </View>
 
-      <View style={styles.body}>
+      {/* Active Class Card */}
+      <View style={styles.activeCard}>
+        <Text style={styles.cardHeader}>Active Class Now</Text>
+        <Text style={styles.courseTitle}>
+          {activeClass.code} - {activeClass.name}
+        </Text>
+        <Text style={styles.timeText}>Closes on : {activeClass.closingTime}</Text>
+
         <TouchableOpacity
-          style={styles.primaryBtn}
+          style={styles.checkInBtn}
           onPress={() => navigation.navigate('QRScanner', { studentId: profile?.id })}
         >
-          <Text style={styles.primaryIcon}>📷</Text>
-          <Text style={styles.primaryLabel}>Scan QR Code</Text>
-          <Text style={styles.primarySub}>Check in to your class</Text>
+          <Text style={styles.checkInText}>Check In</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Upcoming Lectures Section */}
+      <View style={styles.upcomingSection}>
+        <Text style={styles.sectionTitle}>Upcoming Lectures</Text>
+        <View style={styles.upcomingCard}>
+          <Text style={styles.upcomingCourseText}>
+            {upcomingClass.code} - {upcomingClass.name}
+          </Text>
+        </View>
+      </View>
+
+      {/* Bottom Actions (Profile & Sign Out) */}
+      <View style={styles.bottomArea}>
+        <TouchableOpacity
+          style={styles.profileFab}
+          onPress={() => navigation.navigate('StudentProfile', { studentId: profile?.id })}
+        />
 
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 24,
+  },
   header: {
-    backgroundColor: '#6366f1', padding: 24, paddingTop: 56,
+    marginTop: 40,
+    marginBottom: 24,
   },
-  greeting: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  role: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 2 },
-  body: { flex: 1, padding: 20 },
-  primaryBtn: {
-    backgroundColor: '#fff', borderRadius: 16,
-    padding: 28, alignItems: 'center',
-    elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12,
-    borderWidth: 2, borderColor: '#6366f1',
-    marginTop: 24,
+  greetingText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1e293b',
   },
-  primaryIcon: { fontSize: 48, marginBottom: 8 },
-  primaryLabel: { fontSize: 20, fontWeight: '700', color: '#1e293b' },
-  primarySub: { fontSize: 13, color: '#94a3b8', marginTop: 4 },
+  greetingName: {
+    /* Note: To exactly match the cursive font in the image, you will need to load 
+      a custom font (e.g., 'Pacifico' or 'DancingScript') and apply fontFamily here. 
+      Using italic as a fallback. 
+    */
+    fontWeight: '400',
+    fontStyle: 'italic', 
+  },
+  activeCard: {
+    backgroundColor: '#1c625c', // Dark teal matching the design
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+  },
+  cardHeader: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  courseTitle: {
+    color: '#ffffff',
+    fontSize: 12,
+    marginBottom: 16,
+  },
+  timeText: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    marginBottom: 24,
+  },
+  checkInBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  checkInText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  upcomingSection: {
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 12,
+  },
+  upcomingCard: {
+    borderWidth: 1,
+    borderColor: '#334155', // Darker border matching the screenshot
+    borderRadius: 8,
+    padding: 16,
+    backgroundColor: '#ffffff',
+  },
+  upcomingCourseText: {
+    fontSize: 12,
+    color: '#334155',
+  },
+  bottomArea: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  profileFab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#1c625c',
+    marginBottom: 24,
+    elevation: 4, 
+    shadowColor: '#000', 
+    shadowOpacity: 0.1, 
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
   signOutBtn: {
-    backgroundColor: '#fff', borderRadius: 12,
-    padding: 14, alignItems: 'center',
-    borderWidth: 1, borderColor: '#fee2e2',
-    marginTop: 'auto',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fee2e2',
   },
-  signOutText: { color: '#ef4444', fontWeight: '600' },
+  signOutText: {
+    color: '#ef4444',
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });

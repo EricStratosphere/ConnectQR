@@ -1,24 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, Image, ScrollView, Keyboard
+  StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, Image, ScrollView, Keyboard
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-// === RESTORED BACKEND IMPORT ===
-// import { signIn } from '../lib/supabase';
-
-export default function LoginScreen() {
+export default function SignUpScreen() {
+  const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   const navigation = useNavigation();
 
-  // Listen for the keyboard opening and closing
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
@@ -35,29 +31,8 @@ export default function LoginScreen() {
     };
   }, []);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
-      return;
-    }
-    setLoading(true);
-    
-    // === TEMPORARY BYPASS (Delete when ready for real auth) ===
-    setTimeout(() => {
-      setLoading(false);
-      navigation.replace('StudentDashboard', { userEmail: email.trim() });
-    }, 500);
-
-    // === RESTORED SUPABASE AUTH LOGIC ===
-    /*
-    try {
-      await signIn(email.trim(), password);
-    } catch (err) {
-      Alert.alert('Login Failed', err.message ?? 'Invalid credentials.');
-    } finally {
-      setLoading(false);
-    }
-    */
+  const handleSignUp = () => {
+    navigation.replace('StudentDashboard');
   };
 
   return (
@@ -72,19 +47,28 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Only show the top section and logo if the keyboard is CLOSED */}
+          {/* Hide logo when keyboard is open */}
           {!isKeyboardVisible && (
             <View style={styles.topSection}>
-              <Image source={require('../../assets/cody.png')} style={styles.logoImage} />
+               <Image source={require('../../assets/cody.png')} style={styles.logoImage} />
             </View>
           )}
 
-          {/* BOTTOM SECTION */}
+          {/* Remove top border radius when keyboard is open so it looks like a full screen */}
           <View style={[
-            styles.bottomSheet, 
+            styles.bottomSheet,
             isKeyboardVisible && { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 60 }
           ]}>
-            <Text style={styles.title}>Log In</Text>
+            <Text style={styles.title}>Sign Up</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                style={styles.input}
+                value={username}
+                onChangeText={setUsername}
+              />
+            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
@@ -119,20 +103,17 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading}>
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>Log In</Text>
-              }
+            <TouchableOpacity style={styles.btn} onPress={handleSignUp}>
+              <Text style={styles.btnText}>Create Account</Text>
             </TouchableOpacity>
 
             <View style={styles.dividerContainer}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or Login with</Text>
+              <Text style={styles.dividerText}>or Sign up with</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Social Icons */}
+            {/* Added Google and Facebook Icons */}
             <View style={styles.socialContainer}>
               <TouchableOpacity style={styles.socialBtn}>
                  <Ionicons name="logo-google" size={24} color="#EA4335" />
@@ -152,9 +133,9 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f0eff4' },
   container: { flex: 1 },
   topSection: {
-    height: 240,
+    height: 200,
     paddingHorizontal: 32,
-    paddingTop: 40,
+    paddingTop: 20,
     justifyContent: 'flex-end',
   },
   logoImage: { width: 100, height: 100, marginBottom: 0 },
@@ -162,22 +143,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 30, borderTopRightRadius: 30,
-    paddingHorizontal: 32, paddingTop: 40,
+    paddingHorizontal: 32, paddingTop: 32,
     elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8,
   },
-  title: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 32 },
-  inputGroup: { marginBottom: 20 },
+  title: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 24 },
+  inputGroup: { marginBottom: 16 },
   label: { fontSize: 12, fontWeight: '600', color: '#1c625c', marginBottom: 6, marginLeft: 4 },
   input: {
     borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 20,
-    paddingVertical: 14, paddingHorizontal: 20, fontSize: 15, color: '#1e293b', backgroundColor: '#ffffff',
+    paddingVertical: 12, paddingHorizontal: 20, fontSize: 15, color: '#1e293b',
   },
-  btn: { backgroundColor: '#1c625c', borderRadius: 20, paddingVertical: 16, alignItems: 'center', marginTop: 12 },
+  btn: { backgroundColor: '#1c625c', borderRadius: 20, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   btnText: { color: '#ffffff', fontWeight: '700', fontSize: 16 },
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 32 },
+  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#cbd5e1' },
   dividerText: { marginHorizontal: 12, fontSize: 12, color: '#64748b' },
-  socialContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingBottom: 20 },
+  socialContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingBottom: 30 },
   socialBtn: {
     flex: 1, height: 48, borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 24,
     justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff',
@@ -186,6 +167,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#1c625c',
     borderRadius: 20, backgroundColor: '#ffffff',
   },
-  passwordInput: { flex: 1, paddingVertical: 14, paddingHorizontal: 20, fontSize: 15, color: '#1e293b' },
+  passwordInput: { flex: 1, paddingVertical: 12, paddingHorizontal: 20, fontSize: 15, color: '#1e293b' },
   eyeIcon: { paddingRight: 16, paddingVertical: 10 },
 });
