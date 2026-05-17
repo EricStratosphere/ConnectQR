@@ -12,6 +12,9 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  
+  // Role selector state
+  const [role, setRole] = useState('student');
 
   const navigation = useNavigation();
 
@@ -32,7 +35,12 @@ export default function SignUpScreen() {
   }, []);
 
   const handleSignUp = () => {
-    navigation.replace('StudentDashboard');
+    // Route based on selected role
+    if (role === 'instructor') {
+      navigation.replace('InstructorDashboard');
+    } else {
+      navigation.replace('StudentDashboard');
+    }
   };
 
   return (
@@ -60,6 +68,22 @@ export default function SignUpScreen() {
             isKeyboardVisible && { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 60 }
           ]}>
             <Text style={styles.title}>Sign Up</Text>
+
+            {/* Role Selection Toggle */}
+            <View style={styles.roleContainer}>
+              <TouchableOpacity
+                style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]}
+                onPress={() => setRole('student')}
+              >
+                <Text style={[styles.roleText, role === 'student' && styles.roleTextActive]}>Student</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.roleBtn, role === 'instructor' && styles.roleBtnActive]}
+                onPress={() => setRole('instructor')}
+              >
+                <Text style={[styles.roleText, role === 'instructor' && styles.roleTextActive]}>Instructor</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Username</Text>
@@ -94,11 +118,7 @@ export default function SignUpScreen() {
                   style={styles.eyeIcon} 
                   onPress={() => setShowPassword(!showPassword)}
                 >
-                  <Ionicons 
-                    name={showPassword ? 'eye-off' : 'eye'} 
-                    size={20} 
-                    color="#64748b" 
-                  />
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#64748b" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -132,21 +152,24 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f0eff4' },
   container: { flex: 1 },
-  topSection: {
-    height: 200,
-    paddingHorizontal: 32,
-    paddingTop: 20,
-    justifyContent: 'flex-end',
-  },
+  topSection: { height: 200, paddingHorizontal: 32, paddingTop: 20, justifyContent: 'flex-end' },
   logoImage: { width: 100, height: 100, marginBottom: 0 },
   bottomSheet: {
-    flex: 1,
-    backgroundColor: '#ffffff',
+    flex: 1, backgroundColor: '#ffffff',
     borderTopLeftRadius: 30, borderTopRightRadius: 30,
     paddingHorizontal: 32, paddingTop: 32,
     elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8,
   },
-  title: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 24 },
+  title: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 16 },
+
+  roleContainer: {
+    flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 16,
+  },
+  roleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+  roleBtnActive: { backgroundColor: '#1c625c' },
+  roleText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  roleTextActive: { color: '#ffffff' },
+
   inputGroup: { marginBottom: 16 },
   label: { fontSize: 12, fontWeight: '600', color: '#1c625c', marginBottom: 6, marginLeft: 4 },
   input: {

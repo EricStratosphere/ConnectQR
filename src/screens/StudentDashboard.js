@@ -59,10 +59,6 @@ export default function StudentDashboard({ navigation, profile }) {
           style={styles.profileFab}
           onPress={() => navigation.navigate('StudentProfile', { studentId: profile?.id })}
         />
-
-        <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

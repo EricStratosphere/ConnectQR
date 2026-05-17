@@ -7,17 +7,17 @@ import { ActivityIndicator, View } from 'react-native';
 // import { useSession } from '../hooks/useSession';
 // =======================================
 
-// 1. Import your new auth screens here
-import LandingScreen from '../screens/LoadingScreen'; // Pointing to your new LoadingScreen.js
-import SignUpScreen from '../screens/SignUpScreen';   // Make sure you have this file from the earlier step!
+// 1. AUTH SCREENS
+import LandingScreen from '../screens/LandingScreen'; 
+import SignUpScreen from '../screens/SignUpScreen';   
 import LoginScreen from '../screens/LoginScreen';
 
-// Dashboard imports
+// DASHBOARD SCREENS
 import StudentDashboard from '../screens/StudentDashboard';
 import InstructorDashboard from '../screens/InstructorDashboard';
 import QRScannerScreen from '../screens/QRScannerScreen';
 import SessionControlScreen from '../screens/SessionControlScreen';
-
+import StudentProfile from '../screens/StudentProfile'; // 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -28,8 +28,8 @@ export default function AppNavigator() {
 
   // === TEMPORARY TESTING CODE (DELETE LATER) ===
   const loading = false;
-  const session = false; // <-- Keeps us logged out so we see the Landing screen
-  const profile = null; 
+  const session = false; // <-- CHANGED: Set to true to bypass Landing/Login
+  const profile = { role: 'student' }; // <-- CHANGED: Provide a mock student role to route correctly
   // =============================================
 
   if (loading) {
@@ -44,8 +44,6 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? (
-          // 2. Add the Landing and SignUp screens here. 
-          // Because "Landing" is first, it will show up immediately when the app opens!
           <>
             <Stack.Screen name="Landing" component={LandingScreen} />
             <Stack.Screen name="SignUp" component={SignUpScreen} />
@@ -71,6 +69,12 @@ export default function AppNavigator() {
               name="QRScanner"
               component={QRScannerScreen}
               options={{ headerShown: true, title: 'Scan QR Code', headerBackTitle: 'Back' }}
+            />
+            {/* <-- NEW: Added the Student Profile screen so the Dashboard FAB can navigate to it */}
+            <Stack.Screen 
+              name="StudentProfile" 
+              component={StudentProfile} 
+              options={{ headerShown: false }} 
             />
           </>
         )}

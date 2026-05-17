@@ -15,6 +15,9 @@ export default function LoginScreen() {
   const [loading, setLoading]   = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  
+  // Role selector state
+  const [role, setRole] = useState('student');
 
   const navigation = useNavigation();
 
@@ -36,18 +39,24 @@ export default function LoginScreen() {
   }, []);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
-      return;
-    }
-    setLoading(true);
+   if (!email || !password) {
+    Alert.alert('Error', 'Please enter both email and password.');
+    return;
+  }
+  setLoading(true);
+  
+  // === TEMPORARY BYPASS FOR TESTING ===
+  setTimeout(() => {
+    setLoading(false);
     
-    // === TEMPORARY BYPASS (Delete when ready for real auth) ===
-    setTimeout(() => {
-      setLoading(false);
+    // Checks the role toggle on the screen and routes you
+    if (role === 'instructor') {
+      navigation.replace('InstructorDashboard', { userEmail: email.trim() });
+    } else {
       navigation.replace('StudentDashboard', { userEmail: email.trim() });
-    }, 500);
-
+    }
+  }, 500);
+  
     // === RESTORED SUPABASE AUTH LOGIC ===
     /*
     try {
@@ -85,6 +94,22 @@ export default function LoginScreen() {
             isKeyboardVisible && { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 60 }
           ]}>
             <Text style={styles.title}>Log In</Text>
+
+            {/* Role Selection Toggle */}
+            <View style={styles.roleContainer}>
+              <TouchableOpacity
+                style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]}
+                onPress={() => setRole('student')}
+              >
+                <Text style={[styles.roleText, role === 'student' && styles.roleTextActive]}>Student</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.roleBtn, role === 'instructor' && styles.roleBtnActive]}
+                onPress={() => setRole('instructor')}
+              >
+                <Text style={[styles.roleText, role === 'instructor' && styles.roleTextActive]}>Instructor</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
@@ -165,7 +190,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32, paddingTop: 40,
     elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8,
   },
-  title: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 32 },
+  title: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 24 },
+  
+  roleContainer: {
+    flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 20,
+  },
+  roleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+  roleBtnActive: { backgroundColor: '#1c625c' },
+  roleText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  roleTextActive: { color: '#ffffff' },
+
   inputGroup: { marginBottom: 20 },
   label: { fontSize: 12, fontWeight: '600', color: '#1c625c', marginBottom: 6, marginLeft: 4 },
   input: {
