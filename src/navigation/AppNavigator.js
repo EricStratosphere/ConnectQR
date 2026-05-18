@@ -3,9 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 
-// === ORIGINAL CODE (UNCOMMENT LATER) ===
-// import { useSession } from '../hooks/useSession';
-// =======================================
+import { useSession } from '../hooks/useSession';
 
 // 1. AUTH SCREENS
 import LandingScreen from '../screens/LandingScreen'; 
@@ -21,16 +19,7 @@ import StudentProfile from '../screens/StudentProfile'; //
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-  
-  // === ORIGINAL CODE (UNCOMMENT LATER) ===
-  // const { session, profile, loading } = useSession();
-  // =======================================
-
-  // === TEMPORARY TESTING CODE (DELETE LATER) ===
-  const loading = false;
-  const session = false; // <-- CHANGED: Set to true to bypass Landing/Login
-  const profile = { role: 'student' }; // <-- CHANGED: Provide a mock student role to route correctly
-  // =============================================
+  const { session, profile, loading } = useSession();
 
   if (loading) {
     return (

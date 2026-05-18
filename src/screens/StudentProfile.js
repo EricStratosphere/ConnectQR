@@ -1,31 +1,76 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// === ORIGINAL CODE (UNCOMMENT LATER) ===
-// import { signOut } from '../lib/supabase';
+import { supabase, signOut } from '../lib/supabase';
 
-export default function StudentProfile({ navigation }) {
-  // Mock data for the disconnected state
-  const studentInfo = {
-    name: 'Bea R. Molar',
-    university: 'Visayas State University',
-    program: 'BS Computer Science',
-    studentId: '2022-XXXX',
-  };
+export default function StudentProfile({ navigation, route }) {
+  const { studentId } = route?.params ?? {};
+  const [studentInfo, setStudentInfo] = useState(null);
+  const [registeredClasses, setRegisteredClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const registeredClasses = [
-    { id: '1', code: 'CSci 145', name: 'Platform Based Development' },
-    { id: '2', code: 'CSci 121', name: 'Computer Organization' },
-  ];
+  useEffect(() => {
+    const loadStudentData = async () => {
+      try {
+        // Fetch student profile
+        const { data: student } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', studentId)
+          .single();
+        
+        if (student) {
+          setStudentInfo({
+            name: student.full_name || 'Student',
+            university: student.university || 'N/A',
+            program: student.program || 'N/A',
+            studentId: student.id,
+          });
+        }
+        
+        // Fetch registered courses/classes
+        const { data: schedules } = await supabase
+          .from('schedules')
+          .select(`
+            id, 
+            courses ( id, course_code, course_name )
+          `)
+          .order('start_time', { ascending: false });
+        
+        if (schedules) {
+          const uniqueCourses = schedules
+            .filter(schedule => schedule.courses)
+            .reduce((acc, schedule) => {
+              const courseExists = acc.find(c => c.id === schedule.courses.id);
+              if (!courseExists) {
+                acc.push({
+                  id: schedule.courses.id,
+                  code: schedule.courses.course_code,
+                  name: schedule.courses.course_name,
+                });
+              }
+              return acc;
+            }, []);
+          setRegisteredClasses(uniqueCourses);
+        }
+      } catch (err) {
+        console.log('Error loading student data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (studentId) loadStudentData();
+  }, [studentId]);
 
-  const handleSignOut = () => {
-    // === RESTORE THIS LATER FOR REAL SUPABASE AUTH ===
-    // signOut();
-    // =================================================
-
-    // Temporary bypass for testing UI: Sends you back to the Login screen
-    navigation.replace('Login');
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigation.replace('Login');
+    } catch (err) {
+      Alert.alert('Error', 'Could not sign out.');
+    }
   };
 
   const renderClassItem = ({ item }) => (
@@ -34,6 +79,16 @@ export default function StudentProfile({ navigation }) {
       <Text style={styles.className}>{item.name}</Text>
     </View>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#6366f1" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -55,14 +110,14 @@ export default function StudentProfile({ navigation }) {
           </View>
         </View>
 
-        {/* Student Information Box (Updated to match the Dark Teal theme) */}
+        {/* Student Information Box */}
         <View style={styles.infoBox}>
           <Text style={styles.infoBoxTitle}>Student's Information:</Text>
           <View style={styles.infoContent}>
-            <Text style={styles.infoName}>{studentInfo.name}</Text>
-            <Text style={styles.infoText}>{studentInfo.program}</Text>
-            <Text style={styles.infoText}>{studentInfo.university}</Text>
-            <Text style={styles.infoId}>ID: {studentInfo.studentId}</Text>
+            <Text style={styles.infoName}>{studentInfo?.name || 'Loading...'}</Text>
+            <Text style={styles.infoText}>{studentInfo?.program || 'N/A'}</Text>
+            <Text style={styles.infoText}>{studentInfo?.university || 'N/A'}</Text>
+            <Text style={styles.infoId}>ID: {studentInfo?.studentId || 'N/A'}</Text>
           </View>
         </View>
 
@@ -70,16 +125,22 @@ export default function StudentProfile({ navigation }) {
         <View style={styles.classesSection}>
           <Text style={styles.sectionTitle}>Registered Classes</Text>
           
-          <FlatList
-            data={registeredClasses}
-            keyExtractor={item => item.id}
-            renderItem={renderClassItem}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
+          {registeredClasses.length > 0 ? (
+            <FlatList
+              data={registeredClasses}
+              keyExtractor={item => item.id}
+              renderItem={renderClassItem}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.classCard}>
+              <Text style={styles.classCode}>No classes enrolled</Text>
+            </View>
+          )}
         </View>
 
-        {/* New Sign Out Button with Icon */}
+        {/* Sign Out Button */}
         <View style={styles.bottomArea}>
           <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
             <Ionicons name="log-out-outline" size={22} color="#ef4444" />

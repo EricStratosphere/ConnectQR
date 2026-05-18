@@ -6,8 +6,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-// === RESTORED BACKEND IMPORT ===
-// import { signIn } from '../lib/supabase';
+import { signIn } from '../lib/supabase';
 
 export default function LoginScreen() {
   const [email, setEmail]       = useState('');
@@ -45,28 +44,13 @@ export default function LoginScreen() {
   }
   setLoading(true);
   
-  // === TEMPORARY BYPASS FOR TESTING ===
-  setTimeout(() => {
+  try {
+    await signIn(email.trim(), password);
+  } catch (err) {
+    Alert.alert('Login Failed', err.message ?? 'Invalid credentials.');
+  } finally {
     setLoading(false);
-    
-    // Checks the role toggle on the screen and routes you
-    if (role === 'instructor') {
-      navigation.replace('InstructorDashboard', { userEmail: email.trim() });
-    } else {
-      navigation.replace('StudentDashboard', { userEmail: email.trim() });
-    }
-  }, 500);
-  
-    // === RESTORED SUPABASE AUTH LOGIC ===
-    /*
-    try {
-      await signIn(email.trim(), password);
-    } catch (err) {
-      Alert.alert('Login Failed', err.message ?? 'Invalid credentials.');
-    } finally {
-      setLoading(false);
-    }
-    */
+  }
   };
 
   return (

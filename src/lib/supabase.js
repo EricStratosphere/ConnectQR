@@ -20,6 +20,19 @@ export const signIn = async (email, password) => {
   return data;
 };
 
+export const signUp = async (email, password, fullName) => {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  
+  // Create user profile
+  if (data.user) {
+    await supabase
+      .from('users')
+      .insert({ id: data.user.id, email, full_name: fullName, role: 'student' });
+  }
+  return data;
+};
+
 export const signOut = async () => {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;

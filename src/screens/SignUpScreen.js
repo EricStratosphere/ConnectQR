@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { signUp } from '../lib/supabase';
+import { Alert, ActivityIndicator } from 'react-native';
 
 export default function SignUpScreen() {
   const [username, setUsername] = useState('');
@@ -15,6 +17,7 @@ export default function SignUpScreen() {
   
   // Role selector state
   const [role, setRole] = useState('student');
+  const [loading, setLoading] = useState(false);
 
   const navigation = useNavigation();
 
@@ -34,12 +37,20 @@ export default function SignUpScreen() {
     };
   }, []);
 
-  const handleSignUp = () => {
-    // Route based on selected role
-    if (role === 'instructor') {
-      navigation.replace('InstructorDashboard');
-    } else {
-      navigation.replace('StudentDashboard');
+  const handleSignUp = async () => {
+    if (!username || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await signUp(email.trim(), password, username);
+      Alert.alert('Success', 'Account created! Please log in.');
+      navigation.replace('Login');
+    } catch (err) {
+      Alert.alert('Sign Up Failed', err.message ?? 'Could not create account.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -123,8 +134,11 @@ export default function SignUpScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.btn} onPress={handleSignUp}>
-              <Text style={styles.btnText}>Create Account</Text>
+            <TouchableOpacity style={styles.btn} onPress={handleSignUp} disabled={loading}>
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.btnText}>Create Account</Text>
+              }
             </TouchableOpacity>
 
             <View style={styles.dividerContainer}>

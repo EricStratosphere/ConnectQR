@@ -1,22 +1,79 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
-import { signOut } from '../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { supabase, signOut } from '../lib/supabase';
 
 export default function StudentDashboard({ navigation, profile }) {
-  // Hardcoded class data to match the design (replace with your dynamic state later)
-  const activeClass = {
-    code: 'CSci 145',
-    name: 'Platform Based Development',
-    closingTime: '10:15 AM',
-  };
+  const [activeClass, setActiveClass] = useState(null);
+  const [upcomingClass, setUpcomingClass] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const upcomingClass = {
-    code: 'CSci 121',
-    name: 'Computer Organization',
-  };
+  useEffect(() => {
+    const loadClasses = async () => {
+      try {
+        const now = new Date().toISOString();
+        
+        // Fetch active class (currently running)
+        const { data: active } = await supabase
+          .from('schedules')
+          .select(`
+            id, is_active, end_time,
+            courses ( course_code, course_name )
+          `)
+          .eq('is_active', true)
+          .lte('start_time', now)
+          .gt('end_time', now)
+          .single();
+        
+        if (active) {
+          const endTime = new Date(active.end_time);
+          const formattedTime = endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          setActiveClass({
+            code: active.courses?.course_code || 'N/A',
+            name: active.courses?.course_name || 'Unknown',
+            closingTime: formattedTime,
+          });
+        }
+        
+        // Fetch next upcoming class
+        const { data: upcoming } = await supabase
+          .from('schedules')
+          .select(`
+            id, start_time,
+            courses ( course_code, course_name )
+          `)
+          .gt('start_time', now)
+          .order('start_time', { ascending: true })
+          .limit(1)
+          .single();
+        
+        if (upcoming) {
+          setUpcomingClass({
+            code: upcoming.courses?.course_code || 'N/A',
+            name: upcoming.courses?.course_name || 'Unknown',
+          });
+        }
+      } catch (err) {
+        console.log('No active or upcoming classes');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (profile?.id) loadClasses();
+  }, [profile?.id]);
 
   // Determine the display name (defaults to 'student' if no profile name exists)
   const displayName = profile?.full_name ? profile.full_name.toLowerCase() : 'student';
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#6366f1" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -28,29 +85,42 @@ export default function StudentDashboard({ navigation, profile }) {
       </View>
 
       {/* Active Class Card */}
-      <View style={styles.activeCard}>
-        <Text style={styles.cardHeader}>Active Class Now</Text>
-        <Text style={styles.courseTitle}>
-          {activeClass.code} - {activeClass.name}
-        </Text>
-        <Text style={styles.timeText}>Closes on : {activeClass.closingTime}</Text>
+      {activeClass ? (
+        <View style={styles.activeCard}>
+          <Text style={styles.cardHeader}>Active Class Now</Text>
+          <Text style={styles.courseTitle}>
+            {activeClass.code} - {activeClass.name}
+          </Text>
+          <Text style={styles.timeText}>Closes on : {activeClass.closingTime}</Text>
 
-        <TouchableOpacity
-          style={styles.checkInBtn}
-          onPress={() => navigation.navigate('QRScanner', { studentId: profile?.id })}
-        >
-          <Text style={styles.checkInText}>Check In</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.checkInBtn}
+            onPress={() => navigation.navigate('QRScanner', { studentId: profile?.id })}
+          >
+            <Text style={styles.checkInText}>Check In</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.activeCard}>
+          <Text style={styles.cardHeader}>No Active Classes</Text>
+          <Text style={styles.courseTitle}>Check back later for active sessions.</Text>
+        </View>
+      )}
 
       {/* Upcoming Lectures Section */}
       <View style={styles.upcomingSection}>
         <Text style={styles.sectionTitle}>Upcoming Lectures</Text>
-        <View style={styles.upcomingCard}>
-          <Text style={styles.upcomingCourseText}>
-            {upcomingClass.code} - {upcomingClass.name}
-          </Text>
-        </View>
+        {upcomingClass ? (
+          <View style={styles.upcomingCard}>
+            <Text style={styles.upcomingCourseText}>
+              {upcomingClass.code} - {upcomingClass.name}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.upcomingCard}>
+            <Text style={styles.upcomingCourseText}>No upcoming classes</Text>
+          </View>
+        )}
       </View>
 
       {/* Bottom Actions (Profile & Sign Out) */}
