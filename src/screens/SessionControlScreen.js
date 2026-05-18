@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  FlatList, ActivityIndicator, Alert,
+  FlatList, ActivityIndicator, Alert, SafeAreaView
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { supabase, toggleSession, getSessionAttendance } from '../lib/supabase';
 
+// UPDATED: Softer, more professional color palette
 const STATUS_COLOR = {
-  present: '#22c55e',
-  late:    '#f59e0b',
-  absent:  '#ef4444',
+  present: '#059669', // Deep Emerald (instead of neon green)
+  late:    '#d97706', // Muted Amber
+  absent:  '#e11d48', // Soft Rose (instead of bright red)
 };
 
 export default function SessionControlScreen({ route }) {
@@ -71,7 +72,10 @@ export default function SessionControlScreen({ route }) {
     setToggling(true);
     try {
       const updated = await toggleSession(session.id, !session.is_active);
-      setSession(updated);
+      setSession(prev => ({ 
+        ...prev, 
+        is_active: updated.is_active 
+      }));
     } catch (err) {
       Alert.alert('Error', 'Could not update session status.');
     } finally {
@@ -80,7 +84,7 @@ export default function SessionControlScreen({ route }) {
   };
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#6366f1" /></View>;
+    return <View style={styles.center}><ActivityIndicator size="large" color="#1c625c" /></View>;
   }
 
   if (!session) {
@@ -96,7 +100,7 @@ export default function SessionControlScreen({ route }) {
         <Text style={styles.rosterName}>{item.users?.full_name ?? '—'}</Text>
         <Text style={styles.rosterEmail}>{item.users?.email ?? ''}</Text>
       </View>
-      <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[item.status] + '20' }]}>
+      <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[item.status] + '15' }]}>
         <Text style={[styles.statusText, { color: STATUS_COLOR[item.status] }]}>
           {item.status.toUpperCase()}
         </Text>
@@ -120,7 +124,7 @@ export default function SessionControlScreen({ route }) {
         {toggling
           ? <ActivityIndicator color="#fff" />
           : <Text style={styles.toggleBtnText}>
-              {session.is_active ? '🔴 Close Attendance Window' : '🟢 Open Attendance Window'}
+              {session.is_active ? 'Close Attendance Window' : 'Open Attendance Window'}
             </Text>
         }
       </TouchableOpacity>
@@ -129,22 +133,22 @@ export default function SessionControlScreen({ route }) {
         <View style={styles.qrSection}>
           <Text style={styles.qrLabel}>Students scan this QR code</Text>
           <View style={styles.qrContainer}>
-            <QRCode value={session.qr_token} size={200} color="#1e293b" backgroundColor="#fff" />
+            <QRCode value={session.qr_token} size={200} color="#0f172a" backgroundColor="#fff" />
           </View>
         </View>
       )}
 
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: '#22c55e' }]}>{presentCount}</Text>
+          <Text style={[styles.statNum, { color: STATUS_COLOR.present }]}>{presentCount}</Text>
           <Text style={styles.statLabel}>Present</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: '#f59e0b' }]}>{lateCount}</Text>
+          <Text style={[styles.statNum, { color: STATUS_COLOR.late }]}>{lateCount}</Text>
           <Text style={styles.statLabel}>Late</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: '#6366f1' }]}>{attendance.length}</Text>
+          <Text style={[styles.statNum, { color: '#1c625c' }]}>{attendance.length}</Text>
           <Text style={styles.statLabel}>Total</Text>
         </View>
       </View>
@@ -172,38 +176,61 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: '#64748b', fontSize: 16 },
-  header: { backgroundColor: '#6366f1', padding: 20, paddingTop: 48 },
-  courseCode: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', letterSpacing: 1 },
-  courseName: { color: '#fff', fontSize: 20, fontWeight: '700', marginTop: 2 },
-  roomText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 4 },
-  toggleBtn: { margin: 16, padding: 16, borderRadius: 12, alignItems: 'center' },
-  toggleBtnActive: { backgroundColor: '#ef4444' },
-  toggleBtnInactive: { backgroundColor: '#22c55e' },
-  toggleBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  qrSection: { alignItems: 'center', marginVertical: 8 },
-  qrLabel: { fontSize: 14, color: '#64748b', marginBottom: 12, fontWeight: '600' },
+  header: { 
+    backgroundColor: '#1c625c', 
+    padding: 20, 
+    paddingTop: 48, 
+    paddingBottom: 40, 
+    borderBottomLeftRadius: 24, 
+    borderBottomRightRadius: 24 
+  },
+  courseCode: { color: '#dcfce7', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
+  courseName: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 4 },
+  roomText: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 6, fontWeight: '500' },
+  
+  toggleBtn: { 
+    marginHorizontal: 16, 
+    marginTop: -24, 
+    padding: 16, 
+    borderRadius: 16, 
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  toggleBtnActive: { backgroundColor: '#e11d48' }, // Muted Rose
+  toggleBtnInactive: { backgroundColor: '#059669' }, // Deep Emerald
+  toggleBtnText: { color: '#fff', fontWeight: '800', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
+  
+  qrSection: { alignItems: 'center', marginVertical: 20 },
+  qrLabel: { fontSize: 13, color: '#64748b', marginBottom: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   qrContainer: {
-    backgroundColor: '#fff', padding: 16, borderRadius: 16,
-    elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 12,
+    backgroundColor: '#fff', padding: 24, borderRadius: 24,
+    elevation: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16,
+    borderWidth: 1, borderColor: '#e2e8f0'
   },
-  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginVertical: 12, gap: 8 },
+  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginVertical: 16, gap: 12 },
   statBox: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 14,
-    alignItems: 'center', elevation: 2,
+    flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    alignItems: 'center', elevation: 2, borderWidth: 1, borderColor: '#f1f5f9',
+    shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6,
   },
-  statNum: { fontSize: 28, fontWeight: '700' },
-  statLabel: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  rosterTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginHorizontal: 16, marginBottom: 8 },
+  statNum: { fontSize: 28, fontWeight: '800' },
+  statLabel: { fontSize: 11, color: '#64748b', marginTop: 4, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  rosterTitle: { fontSize: 15, fontWeight: '800', color: '#1e293b', marginHorizontal: 16, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   rosterList: { marginHorizontal: 16 },
   rosterRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1,
+    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, elevation: 1,
+    borderWidth: 1, borderColor: '#f1f5f9'
   },
   rosterLeft: { flex: 1 },
-  rosterName: { fontSize: 15, fontWeight: '600', color: '#1e293b' },
-  rosterEmail: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginLeft: 8 },
-  statusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  emptyRoster: { margin: 16, padding: 24, backgroundColor: '#fff', borderRadius: 12, alignItems: 'center' },
-  emptyText: { color: '#94a3b8', fontSize: 14 },
+  rosterName: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
+  rosterEmail: { fontSize: 13, color: '#64748b', marginTop: 2, fontWeight: '500' },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginLeft: 8 },
+  statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  emptyRoster: { margin: 16, padding: 32, backgroundColor: '#fff', borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderStyle: 'dashed' },
+  emptyText: { color: '#94a3b8', fontSize: 14, fontWeight: '500' },
 });

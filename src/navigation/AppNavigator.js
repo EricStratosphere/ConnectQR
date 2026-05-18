@@ -16,6 +16,8 @@ import InstructorDashboard from '../screens/InstructorDashboard';
 import QRScannerScreen from '../screens/QRScannerScreen';
 import SessionControlScreen from '../screens/SessionControlScreen';
 import StudentProfile from '../screens/StudentProfile';
+import InstructorProfile from '../screens/InstructorProfile';
+import CourseDetailsScreen from '../screens/CourseDetailsScreen'; // <-- NEW IMPORT
 
 const Stack = createNativeStackNavigator();
 
@@ -49,6 +51,16 @@ export default function AppNavigator() {
               component={SessionControlScreen}
               options={{ headerShown: true, title: 'Session Control', headerBackTitle: 'Back' }}
             />
+            <Stack.Screen 
+              name="InstructorProfile" 
+              component={InstructorProfile} 
+            />
+            {/* <-- NEW SCREEN REGISTRATION --> */}
+            <Stack.Screen 
+              name="CourseDetails" 
+              component={CourseDetailsScreen} 
+              options={{ headerShown: true, title: 'Course Details', headerBackTitle: 'Back' }}
+            />
           </>
         ) : (
           <>
@@ -63,7 +75,6 @@ export default function AppNavigator() {
             <Stack.Screen 
               name="StudentProfile" 
               component={StudentProfile} 
-              options={{ headerShown: false }} 
             />
           </>
         )}

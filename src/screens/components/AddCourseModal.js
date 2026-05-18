@@ -5,13 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 export default function AddCourseModal({ visible, onClose, onSubmit, loading }) {
   const [courseCode, setCourseCode] = useState('');
   const [courseName, setCourseName] = useState('');
-  const [capacity, setCapacity] = useState('');
 
   const handleSubmit = () => {
     if (!courseCode || !courseName) return;
-    onSubmit({ courseCode, courseName, capacity: parseInt(capacity) || 40 });
+    onSubmit({ courseCode, courseName });
     // Reset fields
-    setCourseCode(''); setCourseName(''); setCapacity('');
+    setCourseCode(''); 
+    setCourseName('');
   };
 
   return (
@@ -33,11 +33,6 @@ export default function AddCourseModal({ visible, onClose, onSubmit, loading }) 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Course Name</Text>
             <TextInput style={styles.input} placeholder="e.g. Platform Based Development" value={courseName} onChangeText={setCourseName} />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Capacity</Text>
-            <TextInput style={styles.input} placeholder="e.g. 40" keyboardType="numeric" value={capacity} onChangeText={setCapacity} />
           </View>
 
           <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>

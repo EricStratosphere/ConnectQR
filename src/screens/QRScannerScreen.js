@@ -6,13 +6,14 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { checkInWithQR } from '../lib/supabase';
 
+// UPDATED: Softer, professional colors matching the new theme
 const RESULT_CONFIG = {
-  present:   { color: '#22c55e', icon: '✓', label: 'Present' },
-  late:      { color: '#f59e0b', icon: '⏰', label: 'Late' },
-  invalid:   { color: '#ef4444', icon: '✗', label: 'Invalid QR' },
-  expired:   { color: '#ef4444', icon: '✗', label: 'Session Closed' },
-  duplicate: { color: '#6366f1', icon: '✓', label: 'Already Checked In' },
-  error:     { color: '#ef4444', icon: '!', label: 'Error' },
+  present:   { color: '#059669', icon: '✓', label: 'Present' }, // Deep Emerald
+  late:      { color: '#d97706', icon: '⏰', label: 'Late' },    // Muted Amber
+  invalid:   { color: '#e11d48', icon: '✗', label: 'Invalid QR' }, // Soft Rose
+  expired:   { color: '#e11d48', icon: '✗', label: 'Session Closed' },
+  duplicate: { color: '#1c625c', icon: '✓', label: 'Already Checked In' }, // Theme Teal
+  error:     { color: '#e11d48', icon: '!', label: 'Error' },
 };
 
 export default function QRScannerScreen({ route }) {
@@ -24,7 +25,7 @@ export default function QRScannerScreen({ route }) {
   const lastScanned                     = useRef('');
 
   if (!permission) {
-    return <View style={styles.center}><ActivityIndicator /></View>;
+    return <View style={styles.center}><ActivityIndicator color="#1c625c" /></View>;
   }
 
   if (!permission.granted) {
@@ -66,7 +67,7 @@ export default function QRScannerScreen({ route }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color="#1c625c" />
         <Text style={styles.loadingText}>Verifying attendance…</Text>
       </View>
     );
@@ -75,9 +76,11 @@ export default function QRScannerScreen({ route }) {
   if (result) {
     const cfg = RESULT_CONFIG[result.status] ?? RESULT_CONFIG.error;
     return (
-      <View style={[styles.center, { backgroundColor: cfg.color + '15' }]}>
+      <View style={[styles.center, { backgroundColor: cfg.color + '10' }]}>
         <View style={[styles.resultCard, { borderColor: cfg.color }]}>
-          <Text style={[styles.resultIcon, { color: cfg.color }]}>{cfg.icon}</Text>
+          <View style={[styles.iconCircle, { backgroundColor: cfg.color + '20' }]}>
+            <Text style={[styles.resultIcon, { color: cfg.color }]}>{cfg.icon}</Text>
+          </View>
           <Text style={[styles.resultLabel, { color: cfg.color }]}>{cfg.label}</Text>
           <Text style={styles.resultMessage}>{result.message}</Text>
 
@@ -129,41 +132,48 @@ export default function QRScannerScreen({ route }) {
   );
 }
 
-const CORNER_SIZE = 24;
-const CORNER_WIDTH = 3;
+const CORNER_SIZE = 28;
+const CORNER_WIDTH = 4;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#f8fafc' },
   overlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center', paddingTop: 60, paddingHorizontal: 24,
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center', paddingTop: 80, paddingHorizontal: 24,
   },
-  overlayTitle: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 8 },
-  overlaySubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 14, textAlign: 'center', marginBottom: 32 },
-  viewfinderContainer: { width: 260, height: 260, justifyContent: 'center', alignItems: 'center' },
-  viewfinder: { width: 240, height: 240, position: 'relative' },
-  corner: { position: 'absolute', width: CORNER_SIZE, height: CORNER_SIZE, borderColor: '#6366f1' },
-  cornerTL: { top: 0, left: 0, borderTopWidth: CORNER_WIDTH, borderLeftWidth: CORNER_WIDTH },
-  cornerTR: { top: 0, right: 0, borderTopWidth: CORNER_WIDTH, borderRightWidth: CORNER_WIDTH },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: CORNER_WIDTH, borderLeftWidth: CORNER_WIDTH },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_WIDTH, borderRightWidth: CORNER_WIDTH },
-  scanHint: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 20 },
+  overlayTitle: { color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 8 },
+  overlaySubtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 15, textAlign: 'center', marginBottom: 48, fontWeight: '500' },
+  viewfinderContainer: { width: 280, height: 280, justifyContent: 'center', alignItems: 'center' },
+  viewfinder: { width: 260, height: 260, position: 'relative' },
+  
+  corner: { position: 'absolute', width: CORNER_SIZE, height: CORNER_SIZE, borderColor: '#1c625c' },
+  cornerTL: { top: 0, left: 0, borderTopWidth: CORNER_WIDTH, borderLeftWidth: CORNER_WIDTH, borderTopLeftRadius: 16 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: CORNER_WIDTH, borderRightWidth: CORNER_WIDTH, borderTopRightRadius: 16 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: CORNER_WIDTH, borderLeftWidth: CORNER_WIDTH, borderBottomLeftRadius: 16 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_WIDTH, borderRightWidth: CORNER_WIDTH, borderBottomRightRadius: 16 },
+  
+  scanHint: { color: 'rgba(255,255,255,0.9)', fontSize: 15, marginTop: 40, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  
   resultCard: {
-    backgroundColor: '#fff', borderRadius: 16, borderWidth: 2,
-    padding: 32, alignItems: 'center', width: '100%', marginBottom: 24,
-    elevation: 4,
+    backgroundColor: '#fff', borderRadius: 24, borderWidth: 2,
+    padding: 32, alignItems: 'center', width: '100%', marginBottom: 32,
+    elevation: 8, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 24,
   },
-  resultIcon: { fontSize: 56, marginBottom: 8 },
-  resultLabel: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
-  resultMessage: { fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 22 },
+  iconCircle: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  resultIcon: { fontSize: 40, fontWeight: '800' },
+  resultLabel: { fontSize: 22, fontWeight: '800', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  resultMessage: { fontSize: 15, color: '#475569', textAlign: 'center', lineHeight: 22, fontWeight: '500' },
   sessionInfo: {
-    marginTop: 16, backgroundColor: '#f1f5f9',
-    borderRadius: 8, padding: 12, width: '100%', gap: 4,
+    marginTop: 24, backgroundColor: '#f8fafc',
+    borderRadius: 16, padding: 16, width: '100%', gap: 8,
+    borderWidth: 1, borderColor: '#e2e8f0'
   },
-  sessionText: { fontSize: 13, color: '#475569' },
-  permText: { fontSize: 15, color: '#64748b', textAlign: 'center', marginBottom: 20, lineHeight: 22 },
-  loadingText: { marginTop: 16, color: '#64748b', fontSize: 15 },
-  btn: { backgroundColor: '#6366f1', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
-  btnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  sessionText: { fontSize: 14, color: '#334155', fontWeight: '600' },
+  
+  permText: { fontSize: 16, color: '#475569', textAlign: 'center', marginBottom: 24, lineHeight: 24, fontWeight: '500' },
+  loadingText: { marginTop: 24, color: '#1c625c', fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
+  
+  btn: { backgroundColor: '#1c625c', paddingHorizontal: 40, paddingVertical: 16, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8 },
+  btnText: { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 0.5, textTransform: 'uppercase' },
 });
