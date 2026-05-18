@@ -8,26 +8,23 @@ import { supabase, signOut } from '../lib/supabase';
 import EditProfileModal from './components/EditProfileModal';
 
 export default function InstructorProfile({ navigation, route }) {
-
-  const [profile, setProfile]   = useState(route?.params?.profile ?? {});
-
-  const [courses, setCourses]   = useState([]);
-  const [stats, setStats]       = useState({ courses: 0, students: 0, avgAttendance: 0, atRisk: 0 });
-  const [loading, setLoading]   = useState(true);
+  const [profile, setProfile] = useState(route?.params?.profile ?? {});
+  const [courses, setCourses] = useState([]);
+  const [stats, setStats]     = useState({ courses: 0, students: 0, avgAttendance: 0, atRisk: 0 });
+  const [loading, setLoading] = useState(true);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ── Load courses assigned to this instructor ─────────────────────────────
   const loadData = useCallback(async () => {
     if (!profile?.id) { setLoading(false); return; }
 
     try {
-      // 1. Courses
+      // Fetch Courses (removed is_active since it's not in schema)
       const { data: courseData, error: courseErr } = await supabase
         .from('courses')
         .select(`
-          id, course_name, course_code, is_active,
+          id, course_name, course_code,
           enrollments ( count )
         `)
         .eq('instructor_id', profile.id);
@@ -41,14 +38,14 @@ export default function InstructorProfile({ navigation, route }) {
 
         const totalStudents = enriched.reduce((sum, c) => sum + c.enrolled_count, 0);
 
-        // 2. At-risk count — adjust table/column to match your schema
+        // Fetch At-risk count (Assuming attendance_summary is a view you created)
         const { count: riskCount } = await supabase
-          .from('attendance_summary')           // your view / materialized view
+          .from('attendance_summary')
           .select('*', { count: 'exact', head: true })
           .eq('instructor_id', profile.id)
           .lt('attendance_pct', 80);
 
-        // 3. Avg attendance — adjust to your schema
+        // Fetch Avg attendance
         const { data: avgData } = await supabase
           .from('attendance_summary')
           .select('attendance_pct')
@@ -59,10 +56,10 @@ export default function InstructorProfile({ navigation, route }) {
           : 0;
 
         setStats({
-          courses:       enriched.length,
-          students:      totalStudents,
+          courses: enriched.length,
+          students: totalStudents,
           avgAttendance: avg,
-          atRisk:        riskCount ?? 0,
+          atRisk: riskCount ?? 0,
         });
       }
     } catch (err) {
@@ -77,23 +74,20 @@ export default function InstructorProfile({ navigation, route }) {
   const handleEditProfile = async (data) => {
     setSaving(true);
     try {
+      // Changed from 'profiles' to 'users' to match schema
+      // Removed employee_id and department since they don't exist
       const { error } = await supabase
-        .from('profiles') // Adjust if your table is named 'users'
+        .from('users') 
         .update({
           full_name: data.fullName,
-          employee_id: data.idNumber,
-          department: data.affiliation
         })
         .eq('id', profile.id);
 
       if (error) throw error;
       
-      // Update local UI immediately
       setProfile(prev => ({
         ...prev,
         full_name: data.fullName,
-        employee_id: data.idNumber,
-        department: data.affiliation
       }));
       
       Alert.alert('Success', 'Profile updated successfully!');
@@ -105,9 +99,6 @@ export default function InstructorProfile({ navigation, route }) {
     }
   };
 
-  
-
-  // ── Sign-out ──────────────────────────────────────────────────────────────
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -115,7 +106,6 @@ export default function InstructorProfile({ navigation, route }) {
     ]);
   };
 
-  // ── Course list item ──────────────────────────────────────────────────────
   const renderCourseItem = ({ item }) => (
     <View style={styles.courseCard}>
       <View style={{ flex: 1 }}>
@@ -123,15 +113,9 @@ export default function InstructorProfile({ navigation, route }) {
         <Text style={styles.courseName}>{item.course_name}</Text>
         <Text style={styles.courseMeta}>{item.enrolled_count} student{item.enrolled_count !== 1 ? 's' : ''} enrolled</Text>
       </View>
-      <View style={[styles.courseBadge, item.is_active ? styles.badgeActive : styles.badgeInactive]}>
-        <Text style={[styles.courseBadgeText, item.is_active ? styles.badgeTextActive : styles.badgeTextInactive]}>
-          {item.is_active ? 'ACTIVE' : 'INACTIVE'}
-        </Text>
-      </View>
     </View>
   );
 
-  // ── Stat tile ─────────────────────────────────────────────────────────────
   const StatTile = ({ num, label, color }) => (
     <View style={styles.statTile}>
       <Text style={[styles.statNum, { color: color ?? '#1c625c' }]}>{num}</Text>
@@ -157,7 +141,6 @@ export default function InstructorProfile({ navigation, route }) {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
-            {/* ── Top bar ── */}
             <View style={styles.topBar}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={22} color="#1e293b" />
@@ -168,39 +151,29 @@ export default function InstructorProfile({ navigation, route }) {
               </TouchableOpacity>
             </View>
 
-            {/* ── Avatar ── */}
             <View style={styles.avatarSection}>
               <View style={styles.avatarCircle}>
                 <Ionicons name="person" size={50} color="#cbd5e1" />
-                <TouchableOpacity style={styles.cameraBadge}>
-                  <Ionicons name="camera" size={13} color="#fff" />
-                </TouchableOpacity>
               </View>
               <Text style={styles.avatarName}>{profile?.full_name ?? 'Instructor'}</Text>
-              <Text style={styles.avatarDept}>{profile?.department ?? 'Dept. of Computer Science'}</Text>
+              <Text style={styles.avatarDept}>Instructor</Text>
             </View>
 
-            {/* ── Stat tiles ── */}
             <View style={styles.statGrid}>
-              <StatTile num={stats.courses}       label="Courses Teaching" />
-              <StatTile num={stats.students}      label="Total Students" />
-              <StatTile num={`${stats.avgAttendance}%`} label="Avg Attendance" />
-              <StatTile num={stats.atRisk} label="At-Risk Students" color="#ef4444" />
+              <StatTile num={stats.courses}       label="Courses" />
+              <StatTile num={stats.students}      label="Students" />
+              <StatTile num={`${stats.avgAttendance}%`} label="Attendance" />
+              <StatTile num={stats.atRisk} label="At-Risk" color="#ef4444" />
             </View>
 
-            {/* ── Info box ── */}
             <View style={styles.infoBox}>
-              <Text style={styles.infoBoxTitle}>Instructor Information</Text>
+              <Text style={styles.infoBoxTitle}>Information</Text>
               <View style={styles.infoContent}>
                 <InfoRow icon="person-outline"    label="Full Name"   value={profile?.full_name ?? '—'} />
-                <InfoRow icon="card-outline"      label="Employee ID" value={profile?.employee_id ?? '—'} />
-                <InfoRow icon="business-outline"  label="University"  value={profile?.university ?? 'Visayas State University'} />
-                <InfoRow icon="library-outline"   label="Department"  value={profile?.department ?? '—'} />
                 <InfoRow icon="mail-outline"      label="Email"       value={profile?.email ?? '—'} />
               </View>
             </View>
 
-            {/* ── Section heading for FlatList ── */}
             <Text style={styles.sectionTitle}>Assigned Courses</Text>
           </>
         }
@@ -232,8 +205,6 @@ export default function InstructorProfile({ navigation, route }) {
   );
 }
 
-// ── Small helper component ────────────────────────────────────────────────────
-
 function InfoRow({ icon, label, value }) {
   return (
     <View style={styles.infoRow}>
@@ -246,13 +217,9 @@ function InfoRow({ icon, label, value }) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f0eff4' },
   listContent: { paddingBottom: 24 },
-
-  // Top bar
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
@@ -260,8 +227,6 @@ const styles = StyleSheet.create({
   backBtn:  { padding: 6, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
   topTitle: { fontSize: 17, fontWeight: '700', color: '#1e293b' },
   editBtn:  { padding: 6 },
-
-  // Avatar
   avatarSection: { alignItems: 'center', paddingVertical: 20 },
   avatarCircle: {
     width: 100, height: 100, borderRadius: 50,
@@ -270,16 +235,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1, shadowRadius: 6, elevation: 3,
   },
-  cameraBadge: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 26, height: 26, borderRadius: 13,
-    backgroundColor: '#1c625c', borderWidth: 2, borderColor: '#fff',
-    justifyContent: 'center', alignItems: 'center',
-  },
   avatarName: { fontSize: 20, fontWeight: '800', color: '#1e293b', marginTop: 12 },
   avatarDept: { fontSize: 13, color: '#94a3b8', marginTop: 3 },
-
-  // Stat grid
   statGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
     paddingHorizontal: 20, gap: 10, marginBottom: 20,
@@ -292,8 +249,6 @@ const styles = StyleSheet.create({
   },
   statNum: { fontSize: 24, fontWeight: '700' },
   statLbl: { fontSize: 11, color: '#94a3b8', marginTop: 3, textAlign: 'center' },
-
-  // Info box
   infoBox: {
     backgroundColor: '#1c625c', marginHorizontal: 20,
     borderRadius: 16, padding: 20, marginBottom: 24,
@@ -309,11 +264,7 @@ const styles = StyleSheet.create({
   infoRowLeft: { flexDirection: 'row', alignItems: 'center' },
   infoLabel:   { fontSize: 12, color: 'rgba(255,255,255,0.65)' },
   infoValue:   { fontSize: 13, color: '#fff', fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
-
-  // Section title
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#1e293b', marginHorizontal: 20, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  // Course cards
   courseCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#fff', marginHorizontal: 20, marginBottom: 10,
@@ -321,21 +272,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#e2e8f0',
     elevation: 1, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4,
   },
-  courseCode:        { fontSize: 12, fontWeight: '800', color: '#1c625c', letterSpacing: 0.5 },
-  courseName:        { fontSize: 14, color: '#334155', fontWeight: '600', marginTop: 2 },
-  courseMeta:        { fontSize: 11, color: '#94a3b8', marginTop: 3 },
-  courseBadge:       { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginLeft: 12 },
-  badgeActive:       { backgroundColor: '#dcfce7' },
-  badgeTextActive:   { color: '#16a34a', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  badgeInactive:     { backgroundColor: '#f1f5f9' },
-  badgeTextInactive: { color: '#94a3b8', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  courseBadgeText:   {},
-
-  // Empty
+  courseCode: { fontSize: 12, fontWeight: '800', color: '#1c625c', letterSpacing: 0.5 },
+  courseName: { fontSize: 14, color: '#334155', fontWeight: '600', marginTop: 2 },
+  courseMeta: { fontSize: 11, color: '#94a3b8', marginTop: 3 },
   emptyState: { alignItems: 'center', padding: 32, gap: 12 },
   emptyText:  { color: '#94a3b8', fontSize: 14, textAlign: 'center' },
-
-  // Bottom / sign-out
   bottomArea:  { paddingHorizontal: 20, paddingTop: 8 },
   signOutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
