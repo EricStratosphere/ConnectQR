@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, Image, ScrollView, Keyboard
+  StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, Image, ScrollView, Keyboard, Alert, ActivityIndicator
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { signUp } from '../lib/supabase';
-import { Alert, ActivityIndicator } from 'react-native';
 
 export default function SignUpScreen() {
   const [username, setUsername] = useState('');
@@ -14,10 +13,9 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  
-  // Role selector state
-  const [role, setRole] = useState('student');
   const [loading, setLoading] = useState(false);
+  
+  const [role, setRole] = useState('student');
 
   const navigation = useNavigation();
 
@@ -44,6 +42,7 @@ export default function SignUpScreen() {
     }
     setLoading(true);
     try {
+      // NOTE: Your signUp function in supabase.js might need to accept 'role' if you want it saved!
       await signUp(email.trim(), password, username);
       Alert.alert('Success', 'Account created! Please log in.');
       navigation.replace('Login');
@@ -66,14 +65,12 @@ export default function SignUpScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Hide logo when keyboard is open */}
           {!isKeyboardVisible && (
             <View style={styles.topSection}>
                <Image source={require('../../assets/cody.png')} style={styles.logoImage} />
             </View>
           )}
 
-          {/* Remove top border radius when keyboard is open so it looks like a full screen */}
           <View style={[
             styles.bottomSheet,
             isKeyboardVisible && { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 60 }
@@ -141,21 +138,13 @@ export default function SignUpScreen() {
               }
             </TouchableOpacity>
 
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or Sign up with</Text>
-              <View style={styles.dividerLine} />
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <Text style={styles.footerLink}>Log In</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Added Google and Facebook Icons */}
-            <View style={styles.socialContainer}>
-              <TouchableOpacity style={styles.socialBtn}>
-                 <Ionicons name="logo-google" size={24} color="#EA4335" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
-                 <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              </TouchableOpacity>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -192,18 +181,13 @@ const styles = StyleSheet.create({
   },
   btn: { backgroundColor: '#1c625c', borderRadius: 20, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   btnText: { color: '#ffffff', fontWeight: '700', fontSize: 16 },
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#cbd5e1' },
-  dividerText: { marginHorizontal: 12, fontSize: 12, color: '#64748b' },
-  socialContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingBottom: 30 },
-  socialBtn: {
-    flex: 1, height: 48, borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 24,
-    justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff',
-  },
   passwordContainer: {
     flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#1c625c',
     borderRadius: 20, backgroundColor: '#ffffff',
   },
   passwordInput: { flex: 1, paddingVertical: 12, paddingHorizontal: 20, fontSize: 15, color: '#1e293b' },
   eyeIcon: { paddingRight: 16, paddingVertical: 10 },
+  footer: { flexDirection: 'row', justifyContent: 'center', paddingBottom: 32, paddingTop: 20 },
+  footerText: { fontSize: 14, color: '#64748b' },
+  footerLink: { fontSize: 14, fontWeight: '700', color: '#1c625c' },
 });

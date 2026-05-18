@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-
 import { signIn } from '../lib/supabase';
 
 export default function LoginScreen() {
@@ -14,13 +13,9 @@ export default function LoginScreen() {
   const [loading, setLoading]   = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  
-  // Role selector state
-  const [role, setRole] = useState('student');
 
   const navigation = useNavigation();
 
-  // Listen for the keyboard opening and closing
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
@@ -38,118 +33,64 @@ export default function LoginScreen() {
   }, []);
 
   const handleLogin = async () => {
-   if (!email || !password) {
-    Alert.alert('Error', 'Please enter both email and password.');
-    return;
-  }
-  setLoading(true);
-  
-  try {
-    await signIn(email.trim(), password);
-  } catch (err) {
-    Alert.alert('Login Failed', err.message ?? 'Invalid credentials.');
-  } finally {
-    setLoading(false);
-  }
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password.');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await signIn(email.trim(), password);
+      if (response && response.error) {
+        throw response.error;
+      }
+    } catch (err) {
+      Alert.alert('Login Failed', err.message ?? 'Invalid credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView 
-          contentContainerStyle={{ flexGrow: 1 }}
-          bounces={false}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Only show the top section and logo if the keyboard is CLOSED */}
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          
           {!isKeyboardVisible && (
             <View style={styles.topSection}>
               <Image source={require('../../assets/cody.png')} style={styles.logoImage} />
             </View>
           )}
 
-          {/* BOTTOM SECTION */}
-          <View style={[
-            styles.bottomSheet, 
-            isKeyboardVisible && { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 60 }
-          ]}>
+          <View style={[styles.bottomSheet, isKeyboardVisible && { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 60 }]}>
             <Text style={styles.title}>Log In</Text>
-
-            {/* Role Selection Toggle */}
-            <View style={styles.roleContainer}>
-              <TouchableOpacity
-                style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]}
-                onPress={() => setRole('student')}
-              >
-                <Text style={[styles.roleText, role === 'student' && styles.roleTextActive]}>Student</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.roleBtn, role === 'instructor' && styles.roleBtnActive]}
-                onPress={() => setRole('instructor')}
-              >
-                <Text style={[styles.roleText, role === 'instructor' && styles.roleTextActive]}>Instructor</Text>
-              </TouchableOpacity>
-            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
+              <TextInput style={styles.input} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  secureTextEntry={!showPassword}
-                  value={password}
-                  onChangeText={setPassword}
-                />
-                <TouchableOpacity 
-                  style={styles.eyeIcon} 
-                  onPress={() => setShowPassword(!showPassword)}
-                >
-                  <Ionicons 
-                    name={showPassword ? 'eye-off' : 'eye'} 
-                    size={20} 
-                    color="#64748b" 
-                  />
+                <TextInput style={styles.passwordInput} secureTextEntry={!showPassword} value={password} onChangeText={setPassword} />
+                <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#64748b" />
                 </TouchableOpacity>
               </View>
             </View>
 
             <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading}>
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>Log In</Text>
-              }
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Log In</Text>}
             </TouchableOpacity>
 
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or Login with</Text>
-              <View style={styles.dividerLine} />
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+                <Text style={styles.footerLink}>Sign Up</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Social Icons */}
-            <View style={styles.socialContainer}>
-              <TouchableOpacity style={styles.socialBtn}>
-                 <Ionicons name="logo-google" size={24} color="#EA4335" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
-                 <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              </TouchableOpacity>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -160,50 +101,24 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f0eff4' },
   container: { flex: 1 },
-  topSection: {
-    height: 240,
-    paddingHorizontal: 32,
-    paddingTop: 40,
-    justifyContent: 'flex-end',
-  },
+  topSection: { height: 240, paddingHorizontal: 32, paddingTop: 40, justifyContent: 'flex-end' },
   logoImage: { width: 100, height: 100, marginBottom: 0 },
   bottomSheet: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 30, borderTopRightRadius: 30,
-    paddingHorizontal: 32, paddingTop: 40,
-    elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8,
+    flex: 1, backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30,
+    paddingHorizontal: 32, paddingTop: 40, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8,
   },
   title: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 24 },
-  
-  roleContainer: {
-    flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 20,
-  },
-  roleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  roleBtnActive: { backgroundColor: '#1c625c' },
-  roleText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  roleTextActive: { color: '#ffffff' },
-
   inputGroup: { marginBottom: 20 },
   label: { fontSize: 12, fontWeight: '600', color: '#1c625c', marginBottom: 6, marginLeft: 4 },
   input: {
-    borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 20,
-    paddingVertical: 14, paddingHorizontal: 20, fontSize: 15, color: '#1e293b', backgroundColor: '#ffffff',
+    borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 20, paddingVertical: 14, paddingHorizontal: 20, fontSize: 15, color: '#1e293b', backgroundColor: '#ffffff',
   },
   btn: { backgroundColor: '#1c625c', borderRadius: 20, paddingVertical: 16, alignItems: 'center', marginTop: 12 },
   btnText: { color: '#ffffff', fontWeight: '700', fontSize: 16 },
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 32 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#cbd5e1' },
-  dividerText: { marginHorizontal: 12, fontSize: 12, color: '#64748b' },
-  socialContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingBottom: 20 },
-  socialBtn: {
-    flex: 1, height: 48, borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 24,
-    justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff',
-  },
-  passwordContainer: {
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#1c625c',
-    borderRadius: 20, backgroundColor: '#ffffff',
-  },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 20, backgroundColor: '#ffffff' },
   passwordInput: { flex: 1, paddingVertical: 14, paddingHorizontal: 20, fontSize: 15, color: '#1e293b' },
   eyeIcon: { paddingRight: 16, paddingVertical: 10 },
+  footer: { flexDirection: 'row', justifyContent: 'center', paddingBottom: 32, paddingTop: 20 },
+  footerText: { fontSize: 14, color: '#64748b' },
+  footerLink: { fontSize: 14, fontWeight: '700', color: '#1c625c' },
 });
