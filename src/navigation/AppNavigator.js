@@ -17,7 +17,7 @@ import QRScannerScreen from '../screens/QRScannerScreen';
 import SessionControlScreen from '../screens/SessionControlScreen';
 import StudentProfile from '../screens/StudentProfile';
 import InstructorProfile from '../screens/InstructorProfile';
-import CourseDetailsScreen from '../screens/CourseDetailsScreen'; // <-- NEW IMPORT
+import CourseDetailsScreen from '../screens/CourseDetailsScreen'; 
 
 const Stack = createNativeStackNavigator();
 
