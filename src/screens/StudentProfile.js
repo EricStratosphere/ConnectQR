@@ -13,45 +13,32 @@ export default function StudentProfile({ navigation, route }) {
   useEffect(() => {
     const loadStudentData = async () => {
       try {
-        // Fetch student profile
         const { data: student } = await supabase
           .from('users')
-          .select('*')
+          .select('full_name, email, role')
           .eq('id', studentId)
           .single();
         
         if (student) {
           setStudentInfo({
             name: student.full_name || 'Student',
-            university: student.university || 'N/A',
-            program: student.program || 'N/A',
-            studentId: student.id,
+            email: student.email || 'No email provided',
+            role: student.role || 'student',
           });
         }
         
-        // Fetch registered courses/classes
-        const { data: schedules } = await supabase
-          .from('schedules')
+        const { data: enrollments } = await supabase
+          .from('enrollments')
           .select(`
-            id, 
             courses ( id, course_code, course_name )
           `)
-          .order('start_time', { ascending: false });
+          .eq('student_id', studentId);
         
-        if (schedules) {
-          const uniqueCourses = schedules
-            .filter(schedule => schedule.courses)
-            .reduce((acc, schedule) => {
-              const courseExists = acc.find(c => c.id === schedule.courses.id);
-              if (!courseExists) {
-                acc.push({
-                  id: schedule.courses.id,
-                  code: schedule.courses.course_code,
-                  name: schedule.courses.course_name,
-                });
-              }
-              return acc;
-            }, []);
+        if (enrollments) {
+          const uniqueCourses = enrollments
+            .map(enrollment => enrollment.courses)
+            .filter(course => course !== null);
+            
           setRegisteredClasses(uniqueCourses);
         }
       } catch (err) {
@@ -75,16 +62,20 @@ export default function StudentProfile({ navigation, route }) {
 
   const renderClassItem = ({ item }) => (
     <View style={styles.classCard}>
-      <Text style={styles.classCode}>{item.code}</Text>
-      <Text style={styles.className}>{item.name}</Text>
+      <View style={styles.classColorBar} />
+      <View style={styles.classContent}>
+        <Text style={styles.classCode}>{item.course_code}</Text>
+        <Text style={styles.className}>{item.course_name}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
     </View>
   );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#6366f1" />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#1c625c" />
         </View>
       </SafeAreaView>
     );
@@ -94,36 +85,38 @@ export default function StudentProfile({ navigation, route }) {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         
-        {/* Header with Back Button */}
+        {/* ── Header ── */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Student's Profile</Text>
-          <View style={{ width: 24 }} /> {/* Spacer for centering */}
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={{ width: 32 }} /> {/* Spacer for perfect centering */}
         </View>
 
-        {/* Avatar Placeholder */}
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatarCircle}>
-            <Ionicons name="person" size={50} color="#cbd5e1" />
+        {/* ── Main ID Card ── */}
+        <View style={styles.profileCard}>
+          
+          <Text style={styles.profileName}>{studentInfo?.name || 'Loading...'}</Text>
+          
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleText}>{studentInfo?.role}</Text>
+          </View>
+
+          <View style={styles.emailRow}>
+            <Ionicons name="mail" size={16} color="#94a3b8" />
+            <Text style={styles.profileEmail}>{studentInfo?.email}</Text>
           </View>
         </View>
 
-        {/* Student Information Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoBoxTitle}>Student's Information:</Text>
-          <View style={styles.infoContent}>
-            <Text style={styles.infoName}>{studentInfo?.name || 'Loading...'}</Text>
-            <Text style={styles.infoText}>{studentInfo?.program || 'N/A'}</Text>
-            <Text style={styles.infoText}>{studentInfo?.university || 'N/A'}</Text>
-            <Text style={styles.infoId}>ID: {studentInfo?.studentId || 'N/A'}</Text>
-          </View>
-        </View>
-
-        {/* Registered Classes Section */}
+        {/* ── Classes Section ── */}
         <View style={styles.classesSection}>
-          <Text style={styles.sectionTitle}>Registered Classes</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Enrolled Classes</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{registeredClasses.length}</Text>
+            </View>
+          </View>
           
           {registeredClasses.length > 0 ? (
             <FlatList
@@ -134,16 +127,17 @@ export default function StudentProfile({ navigation, route }) {
               showsVerticalScrollIndicator={false}
             />
           ) : (
-            <View style={styles.classCard}>
-              <Text style={styles.classCode}>No classes enrolled</Text>
+            <View style={styles.emptyState}>
+              <Ionicons name="book-outline" size={40} color="#cbd5e1" />
+              <Text style={styles.emptyText}>You are not enrolled in any classes yet.</Text>
             </View>
           )}
         </View>
 
-        {/* Sign Out Button */}
+        {/* ── Sign Out Button ── */}
         <View style={styles.bottomArea}>
           <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={22} color="#ef4444" />
+            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
@@ -154,141 +148,73 @@ export default function StudentProfile({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { 
-    flex: 1, 
-    backgroundColor: '#f0eff4' 
-  },
-  container: { 
-    flex: 1, 
-    paddingHorizontal: 24 
-  },
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' }, // Lighter, cleaner background
+  container: { flex: 1, paddingHorizontal: 20 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 32,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 20, marginBottom: 24,
   },
   backBtn: {
-    padding: 4,
+    padding: 8, backgroundColor: '#ffffff', borderRadius: 12,
+    borderWidth: 1, borderColor: '#e2e8f0',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
+
+  // Main Profile Card
+  profileCard: {
+    backgroundColor: '#ffffff', borderRadius: 24, padding: 24,
+    alignItems: 'center', marginBottom: 32,
+    borderWidth: 1, borderColor: '#e2e8f0',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
   },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
+  profileName: { fontSize: 22, fontWeight: '800', color: '#0f172a', marginBottom: 8, textAlign: 'center' },
+  
+  roleBadge: {
+    backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 6,
+    borderRadius: 20, marginBottom: 16,
   },
-  avatarCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: '#d1d5db', 
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: '#ffffff', // Added a white border to make it pop
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+  roleText: { fontSize: 12, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 },
+  
+  emailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  profileEmail: { fontSize: 14, color: '#64748b', fontWeight: '500' },
+
+  // Classes Section
+  classesSection: { flex: 1 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
+  countBadge: {
+    backgroundColor: '#1c625c', width: 24, height: 24, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
   },
-  infoBox: {
-    backgroundColor: '#1c625c', // Updated to Dark Teal to match your picture
-    padding: 24,
-    borderRadius: 16,
-    marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  infoBoxTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.8)', // Lighter text for the dark background
-    marginBottom: 16,
-  },
-  infoContent: {
-    gap: 6,
-  },
-  infoName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#e2e8f0',
-    fontWeight: '500',
-  },
-  infoId: {
-    fontSize: 14,
-    color: '#cbd5e1',
-    fontWeight: '700',
-    marginTop: 4,
-    letterSpacing: 0.5,
-  },
-  classesSection: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 12,
-  },
-  listContainer: {
-    paddingBottom: 20,
-    gap: 12,
-  },
+  countText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
+  
+  listContainer: { paddingBottom: 20, gap: 12 },
   classCard: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#ffffff', borderRadius: 16,
+    borderWidth: 1, borderColor: '#e2e8f0',
+    overflow: 'hidden', paddingRight: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
   },
-  classCode: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#1c625c', 
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  className: {
-    fontSize: 15,
-    color: '#334155',
-    fontWeight: '600',
-  },
-  bottomArea: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
+  classColorBar: { width: 6, height: '100%', backgroundColor: '#1c625c' },
+  classContent: { flex: 1, paddingVertical: 16, paddingHorizontal: 16 },
+  classCode: { fontSize: 12, fontWeight: '800', color: '#1c625c', marginBottom: 4, letterSpacing: 0.5 },
+  className: { fontSize: 15, color: '#334155', fontWeight: '700' },
+
+  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center' },
+
+  // Bottom Area
+  bottomArea: { paddingVertical: 16, alignItems: 'center' },
   signOutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#fee2e2', // Light red border
-    gap: 8, // Space between icon and text
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: 32,
+    borderRadius: 16, borderWidth: 1.5, borderColor: '#fee2e2', gap: 8,
   },
-  signOutText: {
-    color: '#ef4444',
-    fontWeight: '700',
-    fontSize: 15,
-  },
+  signOutText: { color: '#ef4444', fontWeight: '700', fontSize: 15 },
 });
