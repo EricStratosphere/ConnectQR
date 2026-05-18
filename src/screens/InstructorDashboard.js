@@ -246,7 +246,7 @@ export default function InstructorDashboard({ navigation, profile }) {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greeting}>Hello, {profile?.full_name ?? 'Instructor'} 👋</Text>
+            <Text style={styles.greeting}>Hello, {profile?.full_name ?? 'Instructor'} </Text>
             <Text style={styles.subtitle}>Instructor</Text>
           </View>
           <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('InstructorProfile', { profile })}>
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#f8fafc' },
   header:       { backgroundColor: '#1c625c', padding: 20, paddingTop: 52 },
   headerTop:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  greeting:     { color: '#fff', fontSize: 20, fontWeight: '700' },
+  greeting:     { color: '#fff', fontSize: 20, fontWeight: '700',fontStyle: 'italic' },
   subtitle:     { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 },
   profileBtn:   { padding: 4 },
   statRow:      { flexDirection: 'row', gap: 8 },
