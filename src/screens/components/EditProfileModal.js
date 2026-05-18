@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function EditProfileModal({ visible, onClose, onSubmit, loading, profileData }) {
   const [fullName, setFullName] = useState('');
 
-  // When the modal opens or profile data changes, pre-fill the name
+  // When the modal opens or profile data changes, pre-fill the inputs
   useEffect(() => {
     if (profileData) {
       setFullName(profileData.full_name || '');
@@ -13,7 +13,7 @@ export default function EditProfileModal({ visible, onClose, onSubmit, loading, 
   }, [profileData, visible]);
 
   const handleSubmit = () => {
-    // Only submitting the data that exists in the database
+    // Only submit what exists in the users table
     onSubmit({ fullName });
   };
 
@@ -21,7 +21,6 @@ export default function EditProfileModal({ visible, onClose, onSubmit, loading, 
     <Modal visible={visible} animationType="slide" transparent={true}>
       <View style={styles.overlay}>
         <View style={styles.modalCard}>
-          
           <View style={styles.header}>
             <Text style={styles.title}>Edit Profile</Text>
             <TouchableOpacity onPress={onClose}>
@@ -42,7 +41,6 @@ export default function EditProfileModal({ visible, onClose, onSubmit, loading, 
           <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Save Changes</Text>}
           </TouchableOpacity>
-          
         </View>
       </View>
     </Modal>
@@ -54,7 +52,7 @@ const styles = StyleSheet.create({
   modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   title: { fontSize: 20, fontWeight: '700', color: '#1e293b' },
-  inputGroup: { marginBottom: 24 },
+  inputGroup: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: '600', color: '#1c625c', marginBottom: 6 },
   input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14, fontSize: 15, color: '#1e293b' },
   submitBtn: { backgroundColor: '#1c625c', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },

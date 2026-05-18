@@ -74,8 +74,6 @@ export default function InstructorProfile({ navigation, route }) {
   const handleEditProfile = async (data) => {
     setSaving(true);
     try {
-      // Changed from 'profiles' to 'users' to match schema
-      // Removed employee_id and department since they don't exist
       const { error } = await supabase
         .from('users') 
         .update({
@@ -152,9 +150,6 @@ export default function InstructorProfile({ navigation, route }) {
             </View>
 
             <View style={styles.avatarSection}>
-              <View style={styles.avatarCircle}>
-                <Ionicons name="person" size={50} color="#cbd5e1" />
-              </View>
               <Text style={styles.avatarName}>{profile?.full_name ?? 'Instructor'}</Text>
               <Text style={styles.avatarDept}>Instructor</Text>
             </View>
@@ -222,19 +217,12 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 24 },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
+    paddingHorizontal: 20, paddingTop: 30, paddingBottom: 8,
   },
   backBtn:  { padding: 6, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
   topTitle: { fontSize: 17, fontWeight: '700', color: '#1e293b' },
   editBtn:  { padding: 6 },
   avatarSection: { alignItems: 'center', paddingVertical: 20 },
-  avatarCircle: {
-    width: 100, height: 100, borderRadius: 50,
-    backgroundColor: '#d1d5db', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 4, borderColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 6, elevation: 3,
-  },
   avatarName: { fontSize: 20, fontWeight: '800', color: '#1e293b', marginTop: 12 },
   avatarDept: { fontSize: 13, color: '#94a3b8', marginTop: 3 },
   statGrid: {
