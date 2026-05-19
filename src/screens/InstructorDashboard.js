@@ -174,7 +174,7 @@ export default function InstructorDashboard({ navigation, profile }) {
   const loadRooms = useCallback(async () => {
     const { data } = await supabase
       .from('rooms')
-      .select('id, room_name')
+      .select('id, room_name, allowed_ip')
       .order('room_name', { ascending: true });
     setRooms(data ?? []);
   }, []);
@@ -225,6 +225,17 @@ export default function InstructorDashboard({ navigation, profile }) {
       if (error) {
         console.log("Supabase Error:", error);
         throw new Error(error.message);
+      }
+
+      if (sessionData.allowedIp) {
+        const { error: roomError } = await supabase
+          .from('rooms')
+          .update({ allowed_ip: sessionData.allowedIp })
+          .eq('id', sessionData.roomId);
+
+        if (roomError) {
+          throw new Error(roomError.message);
+        }
       }
       
       setSessionModalVisible(false);

@@ -1,40 +1,20 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator, FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../lib/supabase';
-
-// ── Replace with your department Wi-Fi SSID ──────────────────────────────────
-const DEPT_SSID = 'DeptWifi';
-
-function useNetworkStatus() {
-  const [status, setStatus] = useState({ isOnDeptWifi: false, ssid: null });
-
-  useEffect(() => {
-    const update = (state) => {
-      const ssid = state.details?.ssid ?? null;
-      setStatus({ isOnDeptWifi: ssid === DEPT_SSID, ssid });
-    };
-    const unsub = NetInfo.addEventListener(update);
-    NetInfo.fetch().then(update);
-    return unsub;
-  }, []);
-
-  return status;
-}
+import { getNetworkAddress } from '../utils/getNetworkAddress';
 
 export default function StudentDashboard({ navigation, profile }) {
   const [studentName, setStudentName]           = useState('');
   const [activeSession, setActiveSession]       = useState(null);
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [recentCheckins, setRecentCheckins]     = useState([]);
+  const [networkAddress, setNetworkAddress]     = useState(null);
   const [loading, setLoading]                   = useState(true);
-
-  const network = useNetworkStatus();
 
   const loadData = useCallback(async () => {
     if (!profile?.id) { setLoading(false); return; }
@@ -57,13 +37,21 @@ export default function StudentDashboard({ navigation, profile }) {
         .select(`
           id, end_time,
           courses ( course_code, course_name ),
-          rooms ( room_name )
+          rooms ( room_name, allowed_ip )
         `)
         .eq('is_active', true)
         .limit(1)
         .maybeSingle();
 
       setActiveSession(active ?? null);
+
+      try {
+        const currentNetworkAddress = await getNetworkAddress();
+        setNetworkAddress(currentNetworkAddress ?? null);
+      } catch (networkError) {
+        console.warn('StudentDashboard network address fetch failed:', networkError);
+        setNetworkAddress(null);
+      }
 
       // 3. Upcoming sessions (is_active false, start_time in future)
       const { data: upcoming } = await supabase
@@ -124,12 +112,18 @@ export default function StudentDashboard({ navigation, profile }) {
     absent:  { label: 'Absent',  bg: '#fef2f2', text: '#b91c1c' },
   };
 
-  const netOk = network.isOnDeptWifi;
-  const netLabel = netOk
-    ? 'Connected to Dept Wi-Fi'
-    : network.ssid
-    ? `Wrong network: ${network.ssid}`
-    : 'Not on Dept Wi-Fi';
+  const allowedIp = activeSession?.rooms?.allowed_ip?.trim() ?? '';
+  const currentIp = networkAddress?.trim() ?? '';
+  const netOk = Boolean(allowedIp && currentIp && allowedIp === currentIp);
+  const netLabel = !activeSession
+    ? 'No live session'
+    : !currentIp
+    ? 'Checking network address...'
+    : netOk
+    ? 'Authorized network matched'
+    : allowedIp
+    ? `Allowed IP: ${allowedIp}`
+    : 'No allowed IP set for this room';
 
   const renderUpcoming = ({ item }) => (
     <View style={styles.upcomingCard}>
@@ -207,6 +201,11 @@ export default function StudentDashboard({ navigation, profile }) {
                     <Ionicons name="location-outline" size={12} /> {activeSession.rooms.room_name}
                   </Text>
                 ) : null}
+                {activeSession.rooms?.allowed_ip ? (
+                  <Text style={styles.activeRoom}>
+                    <Ionicons name="wifi-outline" size={12} /> {activeSession.rooms.allowed_ip}
+                  </Text>
+                ) : null}
                 <Text style={styles.activeClosing}>
                   Closes at {formatTime(activeSession.end_time)}
                 </Text>
@@ -221,7 +220,7 @@ export default function StudentDashboard({ navigation, profile }) {
                     color={netOk ? '#fff' : 'rgba(255,255,255,0.35)'}
                   />
                   <Text style={[styles.checkInText, !netOk && styles.checkInTextDisabled]}>
-                    {netOk ? 'Scan QR to Check In' : 'Must be on Dept Wi-Fi'}
+                    {netOk ? 'Scan QR to Confirm Attendance' : 'Network mismatch for this room'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -243,7 +242,7 @@ export default function StudentDashboard({ navigation, profile }) {
             >
               <Ionicons name="qr-code-outline" size={22} color={netOk ? '#fff' : '#94a3b8'} />
               <Text style={[styles.bigScanText, !netOk && styles.bigScanTextDisabled]}>
-                Open QR Scanner
+                Confirm Attendance
               </Text>
             </TouchableOpacity>
 
