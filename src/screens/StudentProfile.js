@@ -32,16 +32,39 @@ export default function StudentProfile({ navigation, route }) {
   const [activeFilter, setActiveFilter] = useState('All');
 
   const loadData = useCallback(async () => {
-    if (!studentId) return;
     setLoading(true);
     try {
-      const { data: student } = await supabase
+      // Get current user's ID if studentId is not provided
+      let targetId = studentId;
+      if (!targetId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        targetId = user?.id;
+        if (!targetId) {
+          console.warn('No user ID available');
+          return;
+        }
+      }
+
+      const { data: student, error: studentError } = await supabase
         .from('users')
         .select('full_name, email, role')
-        .eq('id', studentId)
+        .eq('id', targetId)
         .single();
       
-      if (student) {
+      // Handle case where user profile doesn't exist (PGRST116 error)
+      if (studentError?.code === 'PGRST116') {
+        // Profile doesn't exist yet - use auth user data as fallback
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        setStudentInfo({
+          name: authUser?.user_metadata?.full_name || 'Student',
+          email: authUser?.email || 'No email provided',
+          role: 'student',
+        });
+        console.warn('User profile not found in database, using auth fallback');
+      } else if (studentError) {
+        console.error('Error fetching student profile:', studentError);
+        return;
+      } else if (student) {
         setStudentInfo({
           name: student.full_name || 'Student',
           email: student.email || 'No email provided',
@@ -59,7 +82,7 @@ export default function StudentProfile({ navigation, route }) {
             rooms ( room_name )
           )
         `)
-        .eq('student_id', studentId)
+        .eq('student_id', targetId)
         .order('timestamp', { ascending: false });
 
       if (error) throw error;

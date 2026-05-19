@@ -42,8 +42,7 @@ export default function SignUpScreen() {
     }
     setLoading(true);
     try {
-      // NOTE: Your signUp function in supabase.js might need to accept 'role' if you want it saved!
-      await signUp(email.trim(), password, username);
+      await signUp(email.trim(), password, username, role);
       Alert.alert('Success', 'Account created! Please log in.');
       navigation.replace('Login');
     } catch (err) {

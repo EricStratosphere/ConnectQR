@@ -2,8 +2,12 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://nseqrktoiymkjvhepfol.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZXFya3RvaXlta2p2aGVwZm9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MTM0NTksImV4cCI6MjA5NDA4OTQ1OX0.UxtryIrN5FK7wJht8VumEs-wjjsrvh3jSXBrdj0FHZY';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Missing Supabase environment variables. Check your .env file.');
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -20,16 +24,35 @@ export const signIn = async (email, password) => {
   return data;
 };
 
-export const signUp = async (email, password, fullName) => {
+export const signUp = async (email, password, fullName, role = 'student') => {
+  console.log('Starting signup for:', email);
+  
   const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
+  if (error) {
+    console.error('Auth signup error:', error);
+    throw error;
+  }
+  
+  console.log('Auth signup successful, user ID:', data.user?.id);
   
   // Create user profile
   if (data.user) {
-    await supabase
+    console.log('Attempting to insert user profile:', { id: data.user.id, email, full_name: fullName, role });
+    
+    const { data: insertData, error: insertError } = await supabase
       .from('users')
-      .insert({ id: data.user.id, email, full_name: fullName, role: 'student' });
+      .insert({ id: data.user.id, email, full_name: fullName, role });
+    
+    console.log('Insert response - Data:', insertData, 'Error:', insertError);
+    
+    if (insertError) {
+      console.error('Error creating user profile:', insertError);
+      throw new Error(`Failed to create user profile: ${insertError.code} - ${insertError.message}. Check Supabase RLS policies.`);
+    }
+    
+    console.log('User profile created successfully');
   }
+  
   return data;
 };
 
@@ -46,7 +69,15 @@ export const getCurrentUserProfile = async () => {
     .select('*')
     .eq('id', user.id)
     .single();
-  if (error) throw error;
+  
+  // Handle case where user profile doesn't exist yet (e.g., just signed up)
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No profile found - return null instead of throwing
+      return null;
+    }
+    throw error;
+  }
   return data;
 };
 
