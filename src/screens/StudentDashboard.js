@@ -2,12 +2,13 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator, FlatList,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { getNetworkAddress } from '../utils/getNetworkAddress';
-import { Alert, Modal, TextInput } from 'react-native';
+import JoinCourseModal from './components/JoinCourseModal';
 
 export default function StudentDashboard({ navigation, profile }) {
   const [studentName, setStudentName]           = useState('');
@@ -16,16 +17,15 @@ export default function StudentDashboard({ navigation, profile }) {
   const [recentCheckins, setRecentCheckins]     = useState([]);
   const [networkAddress, setNetworkAddress]     = useState(null);
   const [loading, setLoading]                   = useState(true);
-
   const [joinModalVisible, setJoinModalVisible] = useState(false);
-  const [joinCode, setJoinCode] = useState('');
-  const [joining, setJoining] = useState(false);
+  const [joining, setJoining]                   = useState(false);
+
 
   const loadData = useCallback(async () => {
     if (!profile?.id) { setLoading(false); return; }
 
     try {
-      // 1. Full name from users table
+      // 1. Full name
       const { data: user } = await supabase
         .from('users')
         .select('full_name')
@@ -33,48 +33,63 @@ export default function StudentDashboard({ navigation, profile }) {
         .single();
       setStudentName(user?.full_name ?? 'Student');
 
+      // 2. Get all course IDs this student is enrolled in
+      const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select('course_id')
+        .eq('student_id', profile.id);
+
+      const enrolledCourseIds = (enrollments ?? []).map(e => e.course_id);
+
       const now = new Date().toISOString();
 
-      // 2. Currently active session (is_active = true)
-      //    schedules → courses (course_code, course_name) → rooms (room_name)
-      const { data: active } = await supabase
-        .from('schedules')
-        .select(`
-          id, end_time,
-          courses ( course_code, course_name ),
-          rooms ( room_name, allowed_ip )
-        `)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+      if (enrolledCourseIds.length === 0) {
+        // No enrollments — show empty states
+        setActiveSession(null);
+        setUpcomingSessions([]);
+      } else {
+        // 3. Active session from enrolled courses only
+        const { data: active } = await supabase
+          .from('schedules')
+          .select(`
+            id, end_time,
+            courses ( course_code, course_name ),
+            rooms ( room_name, allowed_ip )
+          `)
+          .eq('is_active', true)
+          .in('course_id', enrolledCourseIds)
+          .limit(1)
+          .maybeSingle();
 
-      setActiveSession(active ?? null);
+        setActiveSession(active ?? null);
 
+        // 4. Upcoming sessions from enrolled courses only
+        const { data: upcoming } = await supabase
+          .from('schedules')
+          .select(`
+            id, start_time, end_time,
+            courses ( course_code, course_name ),
+            rooms ( room_name )
+          `)
+          .eq('is_active', false)
+          .gt('start_time', now)
+          .in('course_id', enrolledCourseIds)
+          .order('start_time', { ascending: true })
+          .limit(6);
+
+        setUpcomingSessions(upcoming ?? []);
+      }
+
+      // 5. Network address
       try {
         const currentNetworkAddress = await getNetworkAddress();
         setNetworkAddress(currentNetworkAddress ?? null);
       } catch (networkError) {
-        console.warn('StudentDashboard network address fetch failed:', networkError);
+        console.warn('Network address fetch failed:', networkError);
         setNetworkAddress(null);
       }
 
-      // 3. Upcoming sessions (is_active false, start_time in future)
-      const { data: upcoming } = await supabase
-        .from('schedules')
-        .select(`
-          id, start_time, end_time,
-          courses ( course_code, course_name ),
-          rooms ( room_name )
-        `)
-        .eq('is_active', false)
-        .gt('start_time', now)
-        .order('start_time', { ascending: true })
-        .limit(6);
-
-      setUpcomingSessions(upcoming ?? []);
-
-      // 4. Student's own check-ins from attendance_records
-      //    attendance_records.student_id → attendance_records.session_id → schedules → courses
+      // 6. Recent check-ins (always show student's own history)
       const { data: checkins } = await supabase
         .from('attendance_records')
         .select(`
@@ -150,39 +165,28 @@ export default function StudentDashboard({ navigation, profile }) {
     </View>
   );
 
-  const handleJoinCourse = async () => {
-  if (!joinCode.trim()) return;
-  setJoining(true);
-  try {
-    // 1. Find the course by join code
-    const { data: course, error: courseErr } = await supabase
-      .from('courses')
-      .select('id, course_name')
-      .eq('course_code', joinCode.trim().toUpperCase())
-      .single();
+  const handleJoinCourse = async (course) => {
+    if (!course?.id) return;
+    setJoining(true);
+    try {
+      const { error: enrollErr } = await supabase
+        .from('enrollments')
+        .insert({ course_id: course.id, student_id: profile.id });
 
-    if (courseErr || !course) throw new Error('Course not found. Check the join code.');
+      if (enrollErr) {
+        if (enrollErr.code === '23505') throw new Error('You are already enrolled in this course.');
+        throw enrollErr;
+      }
 
-    // 2. Insert enrollment
-    const { error: enrollErr } = await supabase
-      .from('enrollments')
-      .insert({ course_id: course.id, student_id: profile.id });
-
-    if (enrollErr) {
-      if (enrollErr.code === '23505') throw new Error('You are already enrolled in this course.');
-      throw enrollErr;
+      Alert.alert('Success', `You have joined ${course.course_name}!`);
+      setJoinModalVisible(false);
+      loadData();
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setJoining(false);
     }
-
-    Alert.alert('Success', `You have joined ${course.course_name}!`);
-    setJoinModalVisible(false);
-    setJoinCode('');
-    loadData(); // Refresh dashboard
-  } catch (err) {
-    Alert.alert('Error', err.message);
-  } finally {
-    setJoining(false);
-  }
-};
+  };
 
   if (loading) {
     return (
@@ -273,8 +277,8 @@ export default function StudentDashboard({ navigation, profile }) {
               </View>
             )}
 
-            {/* ── Standalone QR Scanner Button ── */}
-            <TouchableOpacity
+            {/* ── Confirm Attendance Button ── */}
+           {/*  <TouchableOpacity
               style={[styles.bigScanBtn, !netOk && styles.bigScanBtnDisabled]}
               onPress={() => navigation.navigate('QRScanner', { studentId: profile?.id })}
               disabled={!netOk}
@@ -283,7 +287,24 @@ export default function StudentDashboard({ navigation, profile }) {
               <Text style={[styles.bigScanText, !netOk && styles.bigScanTextDisabled]}>
                 Confirm Attendance
               </Text>
+            </TouchableOpacity> */}
+
+            {/* ── Join Course Button ── */}
+            <TouchableOpacity
+              style={styles.joinCourseBtn}
+              onPress={() => setJoinModalVisible(true)}
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#1c625c" />
+              <Text style={styles.joinCourseBtnText}>Join a Course</Text>
             </TouchableOpacity>
+
+            <JoinCourseModal
+              visible={joinModalVisible}
+              onClose={() => setJoinModalVisible(false)}
+              onSubmit={handleJoinCourse}
+              loading={joining}
+              studentId={profile?.id}
+            />
 
             {/* ── Recent Check-ins ── */}
             {recentCheckins.length > 0 && (
@@ -291,11 +312,9 @@ export default function StudentDashboard({ navigation, profile }) {
                 <View style={styles.rowBetween}>
                   <Text style={styles.sectionTitle}>Recent Check-ins</Text>
                   <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate('AttendanceHistory', { studentId: profile?.id })
-                    }
+                    onPress={() => navigation.navigate('StudentProfile', { studentId: profile?.id })}
                   >
-                    <Text style={styles.seeAll}>See all →</Text>
+                    <Text style={styles.seeAll}>See all</Text>
                   </TouchableOpacity>
                 </View>
                 {recentCheckins.map(r => {
@@ -332,34 +351,11 @@ export default function StudentDashboard({ navigation, profile }) {
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={36} color="#cbd5e1" />
             <Text style={styles.emptyText}>No upcoming lectures scheduled.</Text>
+            <Text style={styles.emptySubText}>Join a course to see your schedule here.</Text>
           </View>
         }
       />
 
-      {/* Self-Enrollment Modal */}
-      <Modal visible={joinModalVisible} animationType="slide" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: '#1e293b', marginBottom: 16 }}>Join Course</Text>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#1c625c', marginBottom: 6 }}>Enter Course Code</Text>
-            <TextInput 
-              style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14, fontSize: 15, color: '#1e293b' }} 
-              placeholder="e.g. CS101" 
-              value={joinCode} 
-              onChangeText={setJoinCode} 
-              autoCapitalize="characters"
-            />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <TouchableOpacity style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center' }} onPress={() => setJoinModalVisible(false)}>
-                <Text style={{ color: '#64748b', fontWeight: '700' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#1c625c', alignItems: 'center' }} onPress={handleJoinCourse} disabled={joining}>
-                {joining ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Join</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -402,10 +398,13 @@ const styles = StyleSheet.create({
   noActiveText:    { color: '#fff', fontSize: 15, fontWeight: '700' },
   noActiveSubtext: { color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
-  bigScanBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1c625c', borderRadius: 14, padding: 15, marginBottom: 20 },
+  bigScanBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1c625c', borderRadius: 14, padding: 15, marginBottom: 10 },
   bigScanBtnDisabled: { backgroundColor: '#e2e8f0' },
   bigScanText:        { color: '#fff', fontSize: 15, fontWeight: '700' },
   bigScanTextDisabled:{ color: '#94a3b8' },
+
+  joinCourseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: '#1c625c', borderRadius: 14, padding: 13, marginBottom: 20 },
+  joinCourseBtnText: { color: '#1c625c', fontSize: 14, fontWeight: '700' },
 
   rowBetween:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#1e293b', textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -428,6 +427,7 @@ const styles = StyleSheet.create({
   upcomingDate:  { fontSize: 11, color: '#94a3b8' },
   upcomingTime:  { fontSize: 13, fontWeight: '700', color: '#1e293b' },
 
-  emptyState: { alignItems: 'center', paddingVertical: 24, gap: 10 },
-  emptyText:  { color: '#94a3b8', fontSize: 14 },
+  emptyState:   { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  emptyText:    { color: '#94a3b8', fontSize: 14 },
+  emptySubText: { color: '#cbd5e1', fontSize: 12, textAlign: 'center' },
 });
