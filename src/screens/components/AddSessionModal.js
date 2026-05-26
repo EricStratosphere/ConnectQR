@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, ScrollView, Alert, Platform, TextInput, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,6 +18,11 @@ export default function AddSessionModal({ visible, onClose, onSubmit, loading, c
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState('date');
   const [pickerTarget, setPickerTarget] = useState('');
+
+  useEffect(() => {
+    const selectedRoom = rooms?.find(room => room.id === selectedRoomId);
+    setNetworkIp(selectedRoom?.allowed_ip ?? '');
+  }, [rooms, selectedRoomId]);
 
   const openPicker = (target, mode) => {
     setPickerTarget(target);
@@ -67,7 +72,7 @@ export default function AddSessionModal({ visible, onClose, onSubmit, loading, c
       roomId: selectedRoomId, 
       startTime: finalStart.toISOString(),
       endTime: finalEnd.toISOString(),
-      exclusiveNetwork: isNetworkRestricted ? networkIp.trim() : null, 
+      allowedIp: isNetworkRestricted ? networkIp.trim() : null,
     });
 
     // Reset Form
@@ -146,10 +151,10 @@ export default function AddSessionModal({ visible, onClose, onSubmit, loading, c
             {/* NEW UI: NETWORK TEXT INPUT FIELDS */}
             {isNetworkRestricted && (
               <View style={styles.networkInputGroup}>
-                <Text style={styles.label}>Required Network Identifier / IP</Text>
+                <Text style={styles.label}>Allowed IP Address</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g. 192.168.1.1 or Campus_WiFi_Gateway"
+                  placeholder="e.g. 192.168.1.1"
                   placeholderTextColor="#94a3b8"
                   value={networkIp}
                   onChangeText={setNetworkIp}

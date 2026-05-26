@@ -1,40 +1,25 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator, FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../lib/supabase';
-
-// ── Replace with your department Wi-Fi SSID ──────────────────────────────────
-const DEPT_SSID = 'DeptWifi';
-
-function useNetworkStatus() {
-  const [status, setStatus] = useState({ isOnDeptWifi: false, ssid: null });
-
-  useEffect(() => {
-    const update = (state) => {
-      const ssid = state.details?.ssid ?? null;
-      setStatus({ isOnDeptWifi: ssid === DEPT_SSID, ssid });
-    };
-    const unsub = NetInfo.addEventListener(update);
-    NetInfo.fetch().then(update);
-    return unsub;
-  }, []);
-
-  return status;
-}
+import { getNetworkAddress } from '../utils/getNetworkAddress';
+import { Alert, Modal, TextInput } from 'react-native';
 
 export default function StudentDashboard({ navigation, profile }) {
   const [studentName, setStudentName]           = useState('');
   const [activeSession, setActiveSession]       = useState(null);
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [recentCheckins, setRecentCheckins]     = useState([]);
+  const [networkAddress, setNetworkAddress]     = useState(null);
   const [loading, setLoading]                   = useState(true);
 
-  const network = useNetworkStatus();
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) { setLoading(false); return; }
@@ -57,13 +42,21 @@ export default function StudentDashboard({ navigation, profile }) {
         .select(`
           id, end_time,
           courses ( course_code, course_name ),
-          rooms ( room_name )
+          rooms ( room_name, allowed_ip )
         `)
         .eq('is_active', true)
         .limit(1)
         .maybeSingle();
 
       setActiveSession(active ?? null);
+
+      try {
+        const currentNetworkAddress = await getNetworkAddress();
+        setNetworkAddress(currentNetworkAddress ?? null);
+      } catch (networkError) {
+        console.warn('StudentDashboard network address fetch failed:', networkError);
+        setNetworkAddress(null);
+      }
 
       // 3. Upcoming sessions (is_active false, start_time in future)
       const { data: upcoming } = await supabase
@@ -124,12 +117,18 @@ export default function StudentDashboard({ navigation, profile }) {
     absent:  { label: 'Absent',  bg: '#fef2f2', text: '#b91c1c' },
   };
 
-  const netOk = network.isOnDeptWifi;
-  const netLabel = netOk
-    ? 'Connected to Dept Wi-Fi'
-    : network.ssid
-    ? `Wrong network: ${network.ssid}`
-    : 'Not on Dept Wi-Fi';
+  const allowedIp = activeSession?.rooms?.allowed_ip?.trim() ?? '';
+  const currentIp = networkAddress?.trim() ?? '';
+  const netOk = Boolean(allowedIp && currentIp && allowedIp === currentIp);
+  const netLabel = !activeSession
+    ? 'No live session'
+    : !currentIp
+    ? 'Checking network address...'
+    : netOk
+    ? 'Authorized network matched'
+    : allowedIp
+    ? `Allowed IP: ${allowedIp}`
+    : 'No allowed IP set for this room';
 
   const renderUpcoming = ({ item }) => (
     <View style={styles.upcomingCard}>
@@ -150,6 +149,40 @@ export default function StudentDashboard({ navigation, profile }) {
       </View>
     </View>
   );
+
+  const handleJoinCourse = async () => {
+  if (!joinCode.trim()) return;
+  setJoining(true);
+  try {
+    // 1. Find the course by join code
+    const { data: course, error: courseErr } = await supabase
+      .from('courses')
+      .select('id, course_name')
+      .eq('course_code', joinCode.trim().toUpperCase())
+      .single();
+
+    if (courseErr || !course) throw new Error('Course not found. Check the join code.');
+
+    // 2. Insert enrollment
+    const { error: enrollErr } = await supabase
+      .from('enrollments')
+      .insert({ course_id: course.id, student_id: profile.id });
+
+    if (enrollErr) {
+      if (enrollErr.code === '23505') throw new Error('You are already enrolled in this course.');
+      throw enrollErr;
+    }
+
+    Alert.alert('Success', `You have joined ${course.course_name}!`);
+    setJoinModalVisible(false);
+    setJoinCode('');
+    loadData(); // Refresh dashboard
+  } catch (err) {
+    Alert.alert('Error', err.message);
+  } finally {
+    setJoining(false);
+  }
+};
 
   if (loading) {
     return (
@@ -207,6 +240,11 @@ export default function StudentDashboard({ navigation, profile }) {
                     <Ionicons name="location-outline" size={12} /> {activeSession.rooms.room_name}
                   </Text>
                 ) : null}
+                {activeSession.rooms?.allowed_ip ? (
+                  <Text style={styles.activeRoom}>
+                    <Ionicons name="wifi-outline" size={12} /> {activeSession.rooms.allowed_ip}
+                  </Text>
+                ) : null}
                 <Text style={styles.activeClosing}>
                   Closes at {formatTime(activeSession.end_time)}
                 </Text>
@@ -221,7 +259,7 @@ export default function StudentDashboard({ navigation, profile }) {
                     color={netOk ? '#fff' : 'rgba(255,255,255,0.35)'}
                   />
                   <Text style={[styles.checkInText, !netOk && styles.checkInTextDisabled]}>
-                    {netOk ? 'Scan QR to Check In' : 'Must be on Dept Wi-Fi'}
+                    {netOk ? 'Scan QR to Confirm Attendance' : 'Network mismatch for this room'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -243,7 +281,7 @@ export default function StudentDashboard({ navigation, profile }) {
             >
               <Ionicons name="qr-code-outline" size={22} color={netOk ? '#fff' : '#94a3b8'} />
               <Text style={[styles.bigScanText, !netOk && styles.bigScanTextDisabled]}>
-                Open QR Scanner
+                Confirm Attendance
               </Text>
             </TouchableOpacity>
 
@@ -297,6 +335,31 @@ export default function StudentDashboard({ navigation, profile }) {
           </View>
         }
       />
+
+      {/* Self-Enrollment Modal */}
+      <Modal visible={joinModalVisible} animationType="slide" transparent={true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#1e293b', marginBottom: 16 }}>Join Course</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#1c625c', marginBottom: 6 }}>Enter Course Code</Text>
+            <TextInput 
+              style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14, fontSize: 15, color: '#1e293b' }} 
+              placeholder="e.g. CS101" 
+              value={joinCode} 
+              onChangeText={setJoinCode} 
+              autoCapitalize="characters"
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+              <TouchableOpacity style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center' }} onPress={() => setJoinModalVisible(false)}>
+                <Text style={{ color: '#64748b', fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#1c625c', alignItems: 'center' }} onPress={handleJoinCourse} disabled={joining}>
+                {joining ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Join</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
