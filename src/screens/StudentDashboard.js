@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { getNetworkAddress } from '../utils/getNetworkAddress';
+import { Alert, Modal, TextInput } from 'react-native';
 
 export default function StudentDashboard({ navigation, profile }) {
   const [studentName, setStudentName]           = useState('');
@@ -15,6 +16,10 @@ export default function StudentDashboard({ navigation, profile }) {
   const [recentCheckins, setRecentCheckins]     = useState([]);
   const [networkAddress, setNetworkAddress]     = useState(null);
   const [loading, setLoading]                   = useState(true);
+
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) { setLoading(false); return; }
@@ -144,6 +149,40 @@ export default function StudentDashboard({ navigation, profile }) {
       </View>
     </View>
   );
+
+  const handleJoinCourse = async () => {
+  if (!joinCode.trim()) return;
+  setJoining(true);
+  try {
+    // 1. Find the course by join code
+    const { data: course, error: courseErr } = await supabase
+      .from('courses')
+      .select('id, course_name')
+      .eq('course_code', joinCode.trim().toUpperCase())
+      .single();
+
+    if (courseErr || !course) throw new Error('Course not found. Check the join code.');
+
+    // 2. Insert enrollment
+    const { error: enrollErr } = await supabase
+      .from('enrollments')
+      .insert({ course_id: course.id, student_id: profile.id });
+
+    if (enrollErr) {
+      if (enrollErr.code === '23505') throw new Error('You are already enrolled in this course.');
+      throw enrollErr;
+    }
+
+    Alert.alert('Success', `You have joined ${course.course_name}!`);
+    setJoinModalVisible(false);
+    setJoinCode('');
+    loadData(); // Refresh dashboard
+  } catch (err) {
+    Alert.alert('Error', err.message);
+  } finally {
+    setJoining(false);
+  }
+};
 
   if (loading) {
     return (
@@ -296,6 +335,31 @@ export default function StudentDashboard({ navigation, profile }) {
           </View>
         }
       />
+
+      {/* Self-Enrollment Modal */}
+      <Modal visible={joinModalVisible} animationType="slide" transparent={true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#1e293b', marginBottom: 16 }}>Join Course</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#1c625c', marginBottom: 6 }}>Enter Course Code</Text>
+            <TextInput 
+              style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14, fontSize: 15, color: '#1e293b' }} 
+              placeholder="e.g. CS101" 
+              value={joinCode} 
+              onChangeText={setJoinCode} 
+              autoCapitalize="characters"
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+              <TouchableOpacity style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center' }} onPress={() => setJoinModalVisible(false)}>
+                <Text style={{ color: '#64748b', fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#1c625c', alignItems: 'center' }} onPress={handleJoinCourse} disabled={joining}>
+                {joining ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Join</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

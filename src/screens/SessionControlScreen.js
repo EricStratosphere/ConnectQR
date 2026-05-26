@@ -1,30 +1,33 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  FlatList, ActivityIndicator, Alert, SafeAreaView
+  FlatList, ActivityIndicator, Alert, Modal, ScrollView
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase, toggleSession, getSessionAttendance } from '../lib/supabase';
 
-// UPDATED: Softer, more professional color palette
 const STATUS_COLOR = {
-  present: '#059669', // Deep Emerald (instead of neon green)
-  late:    '#d97706', // Muted Amber
-  absent:  '#e11d48', // Soft Rose (instead of bright red)
+  present: '#059669', 
+  late:    '#d97706', 
+  absent:  '#e11d48', 
+  excused: '#3b82f6', // Added Excused Status
 };
 
 export default function SessionControlScreen({ route }) {
   const { sessionId } = route?.params ?? {};
   const [session, setSession]       = useState(null);
   const [attendance, setAttendance] = useState([]);
+  const [unmarkedStudents, setUnmarkedStudents] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [toggling, setToggling]     = useState(false);
+  const [manualModalVisible, setManualModalVisible] = useState(false);
 
   const loadSession = useCallback(async () => {
     const { data, error } = await supabase
       .from('schedules')
       .select(`
-        id, is_active, qr_token, start_time, end_time,
+        id, is_active, qr_token, start_time, end_time, course_id,
         courses ( course_name, course_code ),
         rooms ( room_name )
       `)
@@ -55,12 +58,7 @@ export default function SessionControlScreen({ route }) {
       .channel(`session-roster-${sessionId}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'attendance_records',
-          filter: `session_id=eq.${sessionId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'attendance_records', filter: `session_id=eq.${sessionId}` },
         async () => { await loadAttendance(); }
       )
       .subscribe();
@@ -72,10 +70,7 @@ export default function SessionControlScreen({ route }) {
     setToggling(true);
     try {
       const updated = await toggleSession(session.id, !session.is_active);
-      setSession(prev => ({ 
-        ...prev, 
-        is_active: updated.is_active 
-      }));
+      setSession(prev => ({ ...prev, is_active: updated.is_active }));
     } catch (err) {
       Alert.alert('Error', 'Could not update session status.');
     } finally {
@@ -83,16 +78,46 @@ export default function SessionControlScreen({ route }) {
     }
   };
 
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#1c625c" /></View>;
-  }
+  const openManualEntry = async () => {
+    try {
+      // Fetch all students enrolled in this course
+      const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select('student_id, users (id, full_name, email)')
+        .eq('course_id', session.course_id);
+      
+      const enrolledUsers = enrollments?.map(e => e.users) || [];
+      const presentIds = attendance.map(a => a.users?.id);
+      
+      // Filter out students who are already checked in
+      const unmarked = enrolledUsers.filter(u => !presentIds.includes(u.id));
+      setUnmarkedStudents(unmarked);
+      setManualModalVisible(true);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch enrolled students.');
+    }
+  };
 
-  if (!session) {
-    return <View style={styles.center}><Text style={styles.errorText}>Session not found.</Text></View>;
-  }
+  const handleManualMark = async (studentId, status = 'present') => {
+    try {
+      const { error } = await supabase.from('attendance_records').insert({
+        session_id: sessionId,
+        student_id: studentId,
+        status: status,
+        timestamp: new Date().toISOString()
+      });
+      if (error) throw error;
+      
+      Alert.alert('Success', `Student marked as ${status}.`);
+      setUnmarkedStudents(prev => prev.filter(s => s.id !== studentId));
+      await loadAttendance();
+    } catch (error) {
+      Alert.alert('Error', 'Could not update attendance.');
+    }
+  };
 
-  const presentCount = attendance.filter(r => r.status === 'present').length;
-  const lateCount    = attendance.filter(r => r.status === 'late').length;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#1c625c" /></View>;
+  if (!session) return <View style={styles.center}><Text style={styles.errorText}>Session not found.</Text></View>;
 
   const renderRosterItem = ({ item }) => (
     <View style={styles.rosterRow}>
@@ -101,15 +126,14 @@ export default function SessionControlScreen({ route }) {
         <Text style={styles.rosterEmail}>{item.users?.email ?? ''}</Text>
       </View>
       <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[item.status] + '15' }]}>
-        <Text style={[styles.statusText, { color: STATUS_COLOR[item.status] }]}>
-          {item.status.toUpperCase()}
-        </Text>
+        <Text style={[styles.statusText, { color: STATUS_COLOR[item.status] }]}>{item.status.toUpperCase()}</Text>
       </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
+      {/* Existing Header & Controls */}
       <View style={styles.header}>
         <Text style={styles.courseCode}>{session.courses?.course_code}</Text>
         <Text style={styles.courseName}>{session.courses?.course_name}</Text>
@@ -118,15 +142,9 @@ export default function SessionControlScreen({ route }) {
 
       <TouchableOpacity
         style={[styles.toggleBtn, session.is_active ? styles.toggleBtnActive : styles.toggleBtnInactive]}
-        onPress={handleToggleSession}
-        disabled={toggling}
+        onPress={handleToggleSession} disabled={toggling}
       >
-        {toggling
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.toggleBtnText}>
-              {session.is_active ? 'Close Attendance Window' : 'Open Attendance Window'}
-            </Text>
-        }
+        {toggling ? <ActivityIndicator color="#fff" /> : <Text style={styles.toggleBtnText}>{session.is_active ? 'Close Attendance Window' : 'Open Attendance Window'}</Text>}
       </TouchableOpacity>
 
       {session.is_active && (
@@ -138,94 +156,79 @@ export default function SessionControlScreen({ route }) {
         </View>
       )}
 
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: STATUS_COLOR.present }]}>{presentCount}</Text>
-          <Text style={styles.statLabel}>Present</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: STATUS_COLOR.late }]}>{lateCount}</Text>
-          <Text style={styles.statLabel}>Late</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: '#1c625c' }]}>{attendance.length}</Text>
-          <Text style={styles.statLabel}>Total</Text>
-        </View>
+      {/* Header Row for Roster & Manual Button */}
+      <View style={styles.rosterHeaderRow}>
+        <Text style={styles.rosterTitle}>Live Roster ({attendance.length})</Text>
+        <TouchableOpacity style={styles.manualBtn} onPress={openManualEntry}>
+          <Ionicons name="hand-right-outline" size={16} color="#1c625c" />
+          <Text style={styles.manualBtnText}>Manual Entry</Text>
+        </TouchableOpacity>
       </View>
 
-      <Text style={styles.rosterTitle}>Live Roster</Text>
-
       {attendance.length === 0 ? (
-        <View style={styles.emptyRoster}>
-          <Text style={styles.emptyText}>No check-ins yet. Waiting for students…</Text>
-        </View>
+        <View style={styles.emptyRoster}><Text style={styles.emptyText}>No check-ins yet. Waiting for students…</Text></View>
       ) : (
-        <FlatList
-          data={attendance}
-          keyExtractor={item => item.id}
-          renderItem={renderRosterItem}
-          style={styles.rosterList}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        />
+        <FlatList data={attendance} keyExtractor={item => item.id} renderItem={renderRosterItem} style={styles.rosterList} contentContainerStyle={{ paddingBottom: 40 }} />
       )}
+
+      {/* MANUAL ENTRY MODAL */}
+      <Modal visible={manualModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Manual Entry</Text>
+              <TouchableOpacity onPress={() => setManualModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>Students enrolled but not yet checked in.</Text>
+            
+            <ScrollView style={{ marginTop: 16 }}>
+              {unmarkedStudents.length === 0 ? (
+                <Text style={styles.emptyText}>All enrolled students are checked in.</Text>
+              ) : (
+                unmarkedStudents.map(student => (
+                  <View key={student.id} style={styles.manualRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rosterName}>{student.full_name}</Text>
+                      <Text style={styles.rosterEmail}>{student.email}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.markBtn} onPress={() => handleManualMark(student.id, 'present')}>
+                      <Text style={styles.markBtnText}>Present</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  /* ... Retain all previous styles from SessionControlScreen ... */
   container: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: '#64748b', fontSize: 16 },
-  header: { 
-    backgroundColor: '#1c625c', 
-    padding: 20, 
-    paddingTop: 48, 
-    paddingBottom: 40, 
-    borderBottomLeftRadius: 24, 
-    borderBottomRightRadius: 24 
-  },
+  header: { backgroundColor: '#1c625c', padding: 20, paddingTop: 48, paddingBottom: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   courseCode: { color: '#dcfce7', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
   courseName: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 4 },
   roomText: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 6, fontWeight: '500' },
-  
-  toggleBtn: { 
-    marginHorizontal: 16, 
-    marginTop: -24, 
-    padding: 16, 
-    borderRadius: 16, 
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  toggleBtnActive: { backgroundColor: '#e11d48' }, // Muted Rose
-  toggleBtnInactive: { backgroundColor: '#059669' }, // Deep Emerald
+  toggleBtn: { marginHorizontal: 16, marginTop: -24, padding: 16, borderRadius: 16, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4 },
+  toggleBtnActive: { backgroundColor: '#e11d48' },
+  toggleBtnInactive: { backgroundColor: '#059669' },
   toggleBtnText: { color: '#fff', fontWeight: '800', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
-  
   qrSection: { alignItems: 'center', marginVertical: 20 },
   qrLabel: { fontSize: 13, color: '#64748b', marginBottom: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  qrContainer: {
-    backgroundColor: '#fff', padding: 24, borderRadius: 24,
-    elevation: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16,
-    borderWidth: 1, borderColor: '#e2e8f0'
-  },
-  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginVertical: 16, gap: 12 },
-  statBox: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16,
-    alignItems: 'center', elevation: 2, borderWidth: 1, borderColor: '#f1f5f9',
-    shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6,
-  },
-  statNum: { fontSize: 28, fontWeight: '800' },
-  statLabel: { fontSize: 11, color: '#64748b', marginTop: 4, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  rosterTitle: { fontSize: 15, fontWeight: '800', color: '#1e293b', marginHorizontal: 16, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  qrContainer: { backgroundColor: '#fff', padding: 24, borderRadius: 24, elevation: 6, borderWidth: 1, borderColor: '#e2e8f0' },
+  rosterHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, marginTop: 16 },
+  rosterTitle: { fontSize: 15, fontWeight: '800', color: '#1e293b', textTransform: 'uppercase', letterSpacing: 0.5 },
+  manualBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#f1f5f9', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' },
+  manualBtnText: { fontSize: 12, fontWeight: '700', color: '#1c625c' },
   rosterList: { marginHorizontal: 16 },
-  rosterRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, elevation: 1,
-    borderWidth: 1, borderColor: '#f1f5f9'
-  },
+  rosterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, elevation: 1, borderWidth: 1, borderColor: '#f1f5f9' },
   rosterLeft: { flex: 1 },
   rosterName: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
   rosterEmail: { fontSize: 13, color: '#64748b', marginTop: 2, fontWeight: '500' },
@@ -233,4 +236,14 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   emptyRoster: { margin: 16, padding: 32, backgroundColor: '#fff', borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderStyle: 'dashed' },
   emptyText: { color: '#94a3b8', fontSize: 14, fontWeight: '500' },
+  
+  /* New Modal Styles */
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
+  modalSubtitle: { fontSize: 13, color: '#64748b', marginTop: 4 },
+  manualRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f1f5f9' },
+  markBtn: { backgroundColor: '#1c625c', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  markBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' }
 });
