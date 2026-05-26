@@ -13,7 +13,7 @@ export default function LandingScreen() {
           <Image source={require('../../assets/cody.png')} style={styles.logoImage} />
         </View>
         
-        <Text style={styles.brandName}>ConnectQR</Text>
+        <Text style={styles.brandName}>QRConnect</Text>
         <Text style={styles.tagline}>Attendance, simplified!</Text>
       </View>
 

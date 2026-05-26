@@ -60,7 +60,7 @@ export default function JoinCourseModal({ visible, onClose, onSubmit, loading, s
     }
   }, [visible, fetchData]);
 
-  // Live search filter
+  // Live search filter (Suggests courses as the user types)
   useEffect(() => {
     const q = query.trim().toLowerCase();
     if (!q) {
