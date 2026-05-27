@@ -19,66 +19,46 @@ export default function JoinCourseModal({ visible, onClose, onSubmit, loading, s
     if (!visible) return;
 
     const fetchCourseData = async () => {
-      const {data, error}= await supabase
+      const { data, error } = await supabase
         .from('courses')
-        .select('id, course_code, course_name')
-        .order('course_code', {ascending : true});
+        .select('id, course_code, course_name, instructor:users!courses_instructor_id_fkey ( full_name )')
+        .order('course_code', { ascending: true });
 
-        if(error){
+      if (error) {
+        throw error;
+      }
+      return data;
+    };
+
+    const fetchEnrollMentsData = async () => {
+      if (studentId) {
+        const { data, error } = await supabase
+          .from('enrollments')
+          .select('course_id')
+          .eq('student_id', studentId);
+
+        if (error) {
           throw error;
         }
-      return data;
-    }
+        return data;
+      }
+      return [];
+    };
 
-    // const fetchEnrollMentsData = async () => {
-    //   if(studentId){
-    //     const {data, error}= await supabase
-    //       .from('enrollments')
-    //       .select('course_id')
-    //       .eq('student_id', studentId);
-          
-    //       if(error){
-    //         throw error;
-    //       }
-    //       return data;
-    //   }
-    //   else{
-    //     const data = await Promise.resolve({data : []});
-    //     return data;
-    //   }
-    // }
     const fetchData = async () => {
       setFetching(true);
       try {
-        // const [coursesRes, enrollRes] = await Promise.all([
-        //   supabase
-        //     .from('courses')
-        //     .select('id, course_code, course_name, users ( full_name )')
-        //     .order('course_code', { ascending: true }),
-        //   studentId
-        //     ? supabase
-        //         .from('enrollments')
-        //         .select('course_id')
-        //         .eq('student_id', studentId)
-        //     : Promise.resolve({ data: [] }),
-        // ]);
+        const coursesData = await fetchCourseData();
+        const enrollData = await fetchEnrollMentsData();
 
-        const coursesRes = await fetchCourseData();
-      //  const enrollRes = await fetchEnrollMentsData();
-
-        
-
-
-        
-
-        const enrolled = (enrollRes.data ?? []).map(e => e.course_id);
+        const enrolled = (enrollData ?? []).map(e => e.course_id);
         setEnrolledIds(enrolled);
 
-        const courses = (coursesRes.data ?? []).map(c => ({
+        const courses = (coursesData ?? []).map(c => ({
           id: c.id,
           course_code: c.course_code,
           course_name: c.course_name,
-          instructor: c.users?.full_name ?? 'Instructor',
+          instructor: c.instructor?.full_name ?? 'Instructor',
           isEnrolled: enrolled.includes(c.id),
         }));
         console.log("courses:", courses);
