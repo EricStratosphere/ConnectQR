@@ -15,53 +15,74 @@ export default function JoinCourseModal({ visible, onClose, onSubmit, loading, s
   const [enrolledIds, setEnrolledIds] = useState([]);
 
   // Fetch all available courses + student's current enrollments when modal opens
-  const fetchData = useCallback(async () => {
-    if (!visible) return;
-    setFetching(true);
-    try {
-      const [coursesRes, enrollRes] = await Promise.all([
-        supabase
-          .from('courses')
-          .select('id, course_code, course_name, users ( full_name )')
-          .order('course_code', { ascending: true }),
-        studentId
-          ? supabase
-              .from('enrollments')
-              .select('course_id')
-              .eq('student_id', studentId)
-          : Promise.resolve({ data: [] }),
-      ]);
-
-      const enrolled = (enrollRes.data ?? []).map(e => e.course_id);
-      setEnrolledIds(enrolled);
-
-      const courses = (coursesRes.data ?? []).map(c => ({
-        id: c.id,
-        course_code: c.course_code,
-        course_name: c.course_name,
-        instructor: c.users?.full_name ?? 'Instructor',
-        isEnrolled: enrolled.includes(c.id),
-      }));
-
-      setAllCourses(courses);
-      setFiltered(courses);
-    } catch (err) {
-      console.error('JoinCourseModal fetch error:', err);
-    } finally {
-      setFetching(false);
-    }
-  }, [visible, studentId]);
-
   useEffect(() => {
-    if (visible) {
-      setQuery('');
-      setSelected(null);
-      fetchData();
-    }
-  }, [visible, fetchData]);
+    if (!visible) return;
+
+    const fetchCourseData = async () => {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('id, course_code, course_name, instructor:users!courses_instructor_id_fkey ( full_name )')
+        .order('course_code', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+      return data;
+    };
+
+    const fetchEnrollMentsData = async () => {
+      if (studentId) {
+        const { data, error } = await supabase
+          .from('enrollments')
+          .select('course_id')
+          .eq('student_id', studentId);
+
+        if (error) {
+          throw error;
+        }
+        return data;
+      }
+      return [];
+    };
+
+    const fetchData = async () => {
+      setFetching(true);
+      try {
+        const coursesData = await fetchCourseData();
+        const enrollData = await fetchEnrollMentsData();
+
+        const enrolled = (enrollData ?? []).map(e => e.course_id);
+        setEnrolledIds(enrolled);
+
+        const courses = (coursesData ?? []).map(c => ({
+          id: c.id,
+          course_code: c.course_code,
+          course_name: c.course_name,
+          instructor: c.instructor?.full_name ?? 'Instructor',
+          isEnrolled: enrolled.includes(c.id),
+        }));
+        console.log("courses:", courses);
+        setAllCourses(courses);
+        setFiltered(courses);
+      } catch (err) {
+        console.error('JoinCourseModal fetch error:', err);
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    setQuery('');
+    setSelected(null);
+    fetchData();
+  }, [visible, studentId]);
 
   // Live search filter (Suggests courses as the user types)
   useEffect(() => {
+    if (allCourses.length === 0) {
+      setFiltered([]);
+      return;
+    }
+    
     const q = query.trim().toLowerCase();
     if (!q) {
       setFiltered(allCourses);
